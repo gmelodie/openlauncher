@@ -2,7 +2,6 @@ package com.openlauncher.app.data
 
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -22,7 +21,7 @@ class SettingsSerializationTest {
     fun `round trip keeps every field`() {
         val original = AppSettings(
             vehicleName = "HB20",
-            compassOffset = -12.5f,
+            mapZoom = 14,
             trip = TripState(running = true, distanceMeters = 1234.5, bestAccelSeconds = 9.87f),
             radioPresets = RadioPresets(fm = listOf(1f, 2f, 3f, 4f, 5f, 6f)),
             levelReference = LevelReference(0.1f, 9.7f, 0.3f)
@@ -73,7 +72,6 @@ class SettingsSerializationTest {
         val prefs = mutablePreferencesOf(
             stringPreferencesKey("vehicle_name") to "Fusca",
             booleanPreferencesKey("font_bold") to true,
-            floatPreferencesKey("compass_offset") to 15f,
             stringPreferencesKey("day_night_mode") to "DARK",
             stringPreferencesKey("soundboard_pads_json") to
                 """[{"label":"horn","audioUri":"","synthType":"boom"}]""",
@@ -84,7 +82,6 @@ class SettingsSerializationTest {
 
         assertEquals("Fusca", migrated.vehicleName)
         assertTrue(migrated.fontBold)
-        assertEquals(15f, migrated.compassOffset, 0.001f)
         assertEquals(DayNightMode.DARK, migrated.dayNightMode)
         assertEquals("boom", migrated.soundboardPads.first().soundName)
         assertTrue(migrated.soundboardPads.first().isAssigned)
@@ -108,6 +105,29 @@ class SettingsSerializationTest {
         assertEquals(defaultShortcuts(), migrated.shortcuts)
         assertNotNull(migrated.widgetLayout)
         assertEquals(defaultWidgetLayout(), migrated.widgetLayout)
+    }
+
+    @Test
+    fun `the compass cell becomes the map cell`() {
+        val stored = AppSettings(
+            widgetLayout = listOf(WidgetConfig(id = "TELEMETRY", gridX = 2, gridY = 0, spanX = 1, spanY = 2))
+        )
+        val migrated = stored.migrated()
+        assertEquals("MAP", migrated.widgetLayout.first().id)
+        assertEquals(2, migrated.widgetLayout.first().spanY)
+        assertEquals(CURRENT_SETTINGS_VERSION, migrated.settingsVersion)
+    }
+
+    @Test
+    fun `a text scale picked before the scale reached every label is reset`() {
+        val migrated = AppSettings(textScale = 1.4f).migrated()
+        assertEquals(AppSettings().textScale, migrated.textScale, 0.001f)
+    }
+
+    @Test
+    fun `a migrated document is left alone on the next read`() {
+        val chosen = AppSettings(textScale = 1.6f, settingsVersion = CURRENT_SETTINGS_VERSION)
+        assertEquals(1.6f, chosen.migrated().textScale, 0.001f)
     }
 
     @Test

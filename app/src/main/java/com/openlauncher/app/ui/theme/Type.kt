@@ -30,22 +30,25 @@ fun AppFont.toFontFamily(): FontFamily = when (this) {
     AppFont.SOURCE_CODE_PRO -> SourceCodePro
 }
 
-fun launcherTypography(bold: Boolean, scale: Float, fontFamily: FontFamily = FontFamily.Default): Typography {
+// Sizes stay unscaled here. The launcher applies its text scale to the font
+// scale of the whole composition, which reaches the many widget labels that set
+// a size of their own instead of taking one from this typography.
+fun launcherTypography(bold: Boolean, fontFamily: FontFamily = FontFamily.Default): Typography {
     val weight = if (bold) FontWeight.Bold else FontWeight.Normal
     return Typography(
-        displayLarge   = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Light,  fontSize = (57 * scale).sp),
-        displayMedium  = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Light,  fontSize = (45 * scale).sp),
-        headlineLarge  = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (32 * scale).sp),
-        headlineMedium = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (28 * scale).sp),
-        headlineSmall  = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (24 * scale).sp),
-        titleLarge     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (22 * scale).sp),
-        titleMedium    = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (16 * scale).sp),
-        titleSmall     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (14 * scale).sp),
-        bodyLarge      = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (16 * scale).sp),
-        bodyMedium     = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (14 * scale).sp),
-        bodySmall      = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = (12 * scale).sp),
-        labelLarge     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (14 * scale).sp),
-        labelMedium    = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (12 * scale).sp),
-        labelSmall     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = (11 * scale).sp),
+        displayLarge   = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Light,  fontSize = 57.sp),
+        displayMedium  = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Light,  fontSize = 45.sp),
+        headlineLarge  = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 32.sp),
+        headlineMedium = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 28.sp),
+        headlineSmall  = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 24.sp),
+        titleLarge     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 22.sp),
+        titleMedium    = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 16.sp),
+        titleSmall     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp),
+        bodyLarge      = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 16.sp),
+        bodyMedium     = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 14.sp),
+        bodySmall      = TextStyle(fontFamily = fontFamily, fontWeight = weight,            fontSize = 12.sp),
+        labelLarge     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp),
+        labelMedium    = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp),
+        labelSmall     = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Medium, fontSize = 11.sp),
     )
 }

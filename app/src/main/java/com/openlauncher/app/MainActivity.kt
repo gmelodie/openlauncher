@@ -127,7 +127,7 @@ private fun LauncherRoot(vm: LauncherViewModel) {
     CompositionLocalProvider(
         LocalDensity provides Density(
             density = baseDensity.density * settings.uiScale,
-            fontScale = baseDensity.fontScale
+            fontScale = baseDensity.fontScale * settings.textScale
         )
     ) {
         if (!settingsLoaded) {
@@ -139,7 +139,6 @@ private fun LauncherRoot(vm: LauncherViewModel) {
             background = background,
             textColor = textColor,
             fontBold = settings.fontBold,
-            textScale = settings.textScale,
             appFont = settings.appFont,
             isDayMode = isDayMode,
             useCustomBg = settings.useCustomBackgroundColor
@@ -279,6 +278,7 @@ private fun HomePane(
     val nowPlaying by vm.nowPlaying.collectAsStateWithLifecycle()
     val weather by vm.weather.collectAsStateWithLifecycle()
     val weatherError by vm.weatherError.collectAsStateWithLifecycle()
+    val weatherPlace by vm.weatherPlace.collectAsStateWithLifecycle()
     val location by vm.location.collectAsStateWithLifecycle()
     val gravity by vm.gravity.collectAsStateWithLifecycle()
     val trip by vm.trip.collectAsStateWithLifecycle()
@@ -286,11 +286,13 @@ private fun HomePane(
     val isWifi by vm.isWifi.collectAsStateWithLifecycle()
     val isData by vm.isData.collectAsStateWithLifecycle()
     val hardwareRadio by vm.hardwareRadio.collectAsStateWithLifecycle()
+    val navLabel = remember(settings.navPackage) { vm.navAppLabel() }
 
     HomeScreen(
         settings = settings,
         weather = weather,
         weatherError = weatherError,
+        weatherPlace = weatherPlace,
         nowPlaying = nowPlaying,
         location = location,
         gravity = gravity,
@@ -321,6 +323,10 @@ private fun HomePane(
         onAddWidget = { id -> vm.addWidget(id) },
         onRemoveWidget = { id -> vm.removeWidget(id) },
         onSetClockStyle = { style -> vm.updateSettings { copy(clockStyle = style) } },
+        onOpenNav = { vm.launchNavApp() },
+        onAssignNav = { vm.startNavPicker() },
+        onSetMapZoom = { zoom -> vm.updateSettings { copy(mapZoom = zoom) } },
+        navLabel = navLabel,
         onSetVitalsAsBars = { asBars -> vm.updateSettings { copy(vitalsAsBars = asBars) } },
         onSetSpeedometerDigitalOnly = { digital -> vm.updateSettings { copy(speedometerDigitalOnly = digital) } },
         onUpdateSoundPad = { idx, pad -> vm.updateSoundboardPad(idx, pad) },
@@ -362,6 +368,7 @@ private fun AppLibraryPane(
             LauncherViewModel.AppPickerTarget.ANDROID_AUTO -> "CHOOSE ANDROID AUTO APP"
             LauncherViewModel.AppPickerTarget.PIP -> "CHOOSE PIP APP"
             LauncherViewModel.AppPickerTarget.RADIO -> "CHOOSE RADIO APP"
+            LauncherViewModel.AppPickerTarget.NAV -> "CHOOSE NAVIGATION APP"
             else -> "CHOOSE CARPLAY APP"
         },
         accent = accent,

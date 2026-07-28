@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.openlauncher.app.model.AppInfo
+import com.openlauncher.app.ui.theme.GruvLightFg3
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.LocalDayMode
@@ -53,9 +54,9 @@ fun AppLibraryScreen(
     val isDayMode     = LocalDayMode.current
     val screenBg      = MaterialTheme.colorScheme.background
     val headerColor   = MaterialTheme.colorScheme.onBackground
-    val placeholderC  = if (isDayMode) Color(0xFF999999) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+    val placeholderC  = if (isDayMode) GruvLightFg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
     val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f)
-    val emptyColor    = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+    val emptyColor    = if (isDayMode) GruvLightFg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
     val fieldTextC    = MaterialTheme.colorScheme.onBackground
     val fieldBorderU  = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
 

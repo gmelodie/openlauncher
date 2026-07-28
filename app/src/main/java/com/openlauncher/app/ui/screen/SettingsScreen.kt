@@ -603,14 +603,14 @@ fun SettingsScreen(
             Column {
                 SettingsRow(
                     label    = "Text Scale",
-                    sublabel = "${"%.0f".format(settings.textScale * 100)}%",
+                    sublabel = "${"%.0f".format(settings.textScale * 100)}%  — scales every label",
                     icon     = Icons.Default.TextFields
                 ) {}
                 Slider(
                     value         = settings.textScale,
                     onValueChange = { onUpdate { copy(textScale = it) } },
-                    valueRange    = 0.8f..1.4f,
-                    steps         = 5,
+                    valueRange    = 0.8f..1.8f,
+                    steps         = 9,
                     colors        = sliderColors(accent),
                     modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
@@ -676,24 +676,6 @@ fun SettingsScreen(
                 accent   = accent,
                 onClick  = { onRecalibrateLevel() }
             )
-
-            SettingsDivider()
-
-            Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                SettingsRow(
-                    label    = "Compass Heading Offset",
-                    sublabel = "Manual alignment: ${if (settings.compassOffset >= 0) "+" else ""}${settings.compassOffset.toInt()}° — aligns the compass with the vehicle front",
-                    icon     = Icons.Default.Explore
-                ) {}
-                Slider(
-                    value         = settings.compassOffset,
-                    onValueChange = { onUpdate { copy(compassOffset = it) } },
-                    valueRange    = -180f..180f,
-                    steps         = 71,
-                    colors        = sliderColors(accent),
-                    modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                )
-            }
         }
 
         // ── Updates ──────────────────────────────────────────────────────────

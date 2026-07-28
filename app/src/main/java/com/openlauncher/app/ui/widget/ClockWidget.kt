@@ -26,6 +26,9 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
+import com.openlauncher.app.ui.theme.widgetLine
 
 @Composable
 fun ClockWidget(
@@ -46,8 +49,8 @@ fun ClockWidget(
         }
     }
 
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val subColor     = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+    val contentColor = widgetInk(isDayMode)
+    val subColor     = widgetSubInk(isDayMode)
 
     Box(modifier = modifier) {
         when (style) {
@@ -105,8 +108,9 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
 
     val shortDateFormat = remember(locale) { SimpleDateFormat("EEE d", locale) }
 
-    val ringColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF2A2A2A)
-    val minuteHandColor = if (isDayMode) Color(0xFF222222) else MaterialTheme.colorScheme.onBackground
+    val ringColor = widgetLine(isDayMode)
+    val tickColor = widgetSubInk(isDayMode)
+    val minuteHandColor = widgetInk(isDayMode)
     val pivotBg = if (isDayMode) GruvLightBg2 else Color(0xFF1E1E1E)
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -119,7 +123,7 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
                 color  = ringColor,
                 radius = radius,
                 center = Offset(cx, cy),
-                style  = Stroke(1.dp.toPx())
+                style  = Stroke(2.dp.toPx())
             )
 
             for (i in 0 until 60) {
@@ -133,13 +137,13 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
                 }
                 drawLine(
                     color       = when {
-                        isQuarter -> accent.copy(alpha = 0.9f)
-                        isHour    -> if (isDayMode) Color(0xFF888888) else Color(0xFF555555)
-                        else      -> if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF2E2E2E)
+                        isQuarter -> accent
+                        isHour    -> tickColor
+                        else      -> tickColor.copy(alpha = 0.55f)
                     },
                     start       = Offset(cx + cos(angle) * radius * inner, cy + sin(angle) * radius * inner),
                     end         = Offset(cx + cos(angle) * radius * 0.96f, cy + sin(angle) * radius * 0.96f),
-                    strokeWidth = if (isQuarter) 1.5.dp.toPx() else 0.8.dp.toPx(),
+                    strokeWidth = if (isQuarter) 2.6.dp.toPx() else 1.6.dp.toPx(),
                     cap         = StrokeCap.Round
                 )
             }
@@ -149,7 +153,7 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
                 color       = accent,
                 start       = Offset(cx - cos(hAngle) * radius * 0.14f, cy - sin(hAngle) * radius * 0.14f),
                 end         = Offset(cx + cos(hAngle) * radius * 0.50f, cy + sin(hAngle) * radius * 0.50f),
-                strokeWidth = 3.dp.toPx(),
+                strokeWidth = 4.dp.toPx(),
                 cap         = StrokeCap.Round
             )
 
@@ -158,7 +162,7 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
                 color       = minuteHandColor,
                 start       = Offset(cx - cos(mAngle) * radius * 0.14f, cy - sin(mAngle) * radius * 0.14f),
                 end         = Offset(cx + cos(mAngle) * radius * 0.74f, cy + sin(mAngle) * radius * 0.74f),
-                strokeWidth = 1.5.dp.toPx(),
+                strokeWidth = 2.6.dp.toPx(),
                 cap         = StrokeCap.Round
             )
 
@@ -167,7 +171,7 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
                 color       = accent.copy(alpha = 0.75f),
                 start       = Offset(cx - cos(sAngle) * radius * 0.22f, cy - sin(sAngle) * radius * 0.22f),
                 end         = Offset(cx + cos(sAngle) * radius * 0.88f, cy + sin(sAngle) * radius * 0.88f),
-                strokeWidth = 0.8.dp.toPx(),
+                strokeWidth = 1.4.dp.toPx(),
                 cap         = StrokeCap.Round
             )
 
@@ -182,8 +186,8 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
 
         Text(
             text      = shortDateFormat.format(now).uppercase(locale),
-            color     = if (isDayMode) Color(0xFF999999) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-            fontSize  = 9.sp,
+            color     = widgetSubInk(isDayMode),
+            fontSize  = 11.sp,
             letterSpacing = 1.5.sp,
             modifier  = Modifier
                 .align(Alignment.Center)

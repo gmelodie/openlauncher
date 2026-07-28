@@ -11,6 +11,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openlauncher.app.model.WeatherState
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
 
 @Composable
 fun WeatherWidget(
@@ -18,11 +20,13 @@ fun WeatherWidget(
     accent: Color,
     metric: Boolean,
     error: String? = null,
+    // City behind an IP-address lookup. Null while a GPS fix drives the reading.
+    place: String? = null,
     isDayMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val subColor     = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+    val contentColor = widgetInk(isDayMode)
+    val subColor     = widgetSubInk(isDayMode)
 
     Box(modifier = modifier) {
         Column(
@@ -43,18 +47,26 @@ fun WeatherWidget(
                 Text(
                     text          = state.conditionLabel.uppercase(),
                     color         = subColor,
-                    fontSize      = 9.sp,
+                    fontSize      = 12.sp,
                     letterSpacing = 1.sp
                 )
+                if (place != null) {
+                    Text(
+                        text          = "≈ ${place.uppercase()}",
+                        color         = subColor,
+                        fontSize      = 10.sp,
+                        letterSpacing = 1.sp
+                    )
+                }
                 return@Column
             }
             // The cell used to stay blank on a failed request, which reads the same
             // as "no data yet".
             Text(text = "—", color = subColor, fontSize = 32.sp, fontWeight = FontWeight.Light)
             Text(
-                text          = if (error != null) "WEATHER UNAVAILABLE" else "WAITING FOR GPS",
+                text          = if (error != null) "WEATHER UNAVAILABLE" else "LOADING",
                 color         = subColor,
-                fontSize      = 9.sp,
+                fontSize      = 12.sp,
                 letterSpacing = 1.sp
             )
         }

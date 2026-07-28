@@ -28,7 +28,7 @@ internal object LegacySettings {
     private val APP_FONT           = stringPreferencesKey("app_font")
     private val SHOW_WEATHER       = booleanPreferencesKey("show_weather")
     private val SHOW_CLOCK         = booleanPreferencesKey("show_clock")
-    private val SHOW_TELEMETRY     = booleanPreferencesKey("show_telemetry")
+    private val SHOW_MAP           = booleanPreferencesKey("show_telemetry")
     private val SHOW_NOW_PLAYING   = booleanPreferencesKey("show_now_playing")
     private val SHOW_ALTIMETER     = booleanPreferencesKey("show_altimeter")
     private val SHOW_SPEEDOMETER   = booleanPreferencesKey("show_speedometer")
@@ -49,7 +49,6 @@ internal object LegacySettings {
     private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     private val SHOW_VITALS          = booleanPreferencesKey("show_vitals")
     private val SHOW_TRIP_TRACKER    = booleanPreferencesKey("show_trip_tracker")
-    private val COMPASS_OFFSET       = floatPreferencesKey("compass_offset")
     private val SHOW_SOUNDBOARD      = booleanPreferencesKey("show_soundboard")
     private val SOUNDBOARD_PADS_JSON = stringPreferencesKey("soundboard_pads_json")
     private val VITALS_AS_BARS       = booleanPreferencesKey("vitals_as_bars")
@@ -80,7 +79,7 @@ internal object LegacySettings {
             appFont         = prefs[APP_FONT].toEnum(defaults.appFont),
             showWeather     = prefs[SHOW_WEATHER] ?: defaults.showWeather,
             showClock       = prefs[SHOW_CLOCK] ?: defaults.showClock,
-            showTelemetry   = prefs[SHOW_TELEMETRY] ?: defaults.showTelemetry,
+            showMap         = prefs[SHOW_MAP] ?: defaults.showMap,
             showNowPlaying  = prefs[SHOW_NOW_PLAYING] ?: defaults.showNowPlaying,
             showAltimeter   = prefs[SHOW_ALTIMETER] ?: defaults.showAltimeter,
             showSpeedometer = prefs[SHOW_SPEEDOMETER] ?: defaults.showSpeedometer,
@@ -102,7 +101,6 @@ internal object LegacySettings {
             onboardingCompleted = prefs[ONBOARDING_COMPLETED] ?: defaults.onboardingCompleted,
             showVitals       = prefs[SHOW_VITALS] ?: defaults.showVitals,
             showTripTracker  = prefs[SHOW_TRIP_TRACKER] ?: defaults.showTripTracker,
-            compassOffset    = prefs[COMPASS_OFFSET] ?: defaults.compassOffset,
             showSoundboard   = prefs[SHOW_SOUNDBOARD] ?: defaults.showSoundboard,
             soundboardPads   = readPads(prefs) ?: defaults.soundboardPads,
             vitalsAsBars     = prefs[VITALS_AS_BARS] ?: defaults.vitalsAsBars,

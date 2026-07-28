@@ -12,6 +12,7 @@ val GruvLightBg0   = Color(0xFFFBF1C7) // base background
 val GruvLightBg1   = Color(0xFFEBDBB2) // raised surface
 val GruvLightBg2   = Color(0xFFD5C4A1) // higher surface
 val GruvLightBg3   = Color(0xFFBDAE93) // borders / outlines
+val GruvLightFg0   = Color(0xFF282828) // strongest ink
 val GruvLightFg1   = Color(0xFF3C3836) // body text
 val GruvLightFg3   = Color(0xFF665C54) // muted text
 

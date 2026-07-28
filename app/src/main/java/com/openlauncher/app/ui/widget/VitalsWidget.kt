@@ -27,6 +27,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
+import com.openlauncher.app.ui.theme.widgetLine
 
 private const val NO_READING = "—"
 
@@ -201,9 +204,9 @@ private fun BarGauge(
     isDayMode: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (isDayMode) Color(0xFFD6D6D6) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
-    val contentColor = if (isDayMode) Color(0xFF111111) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground
-    val labelColor = if (isDayMode) Color(0xFF666666) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    val trackColor = widgetLine(isDayMode)
+    val contentColor = widgetInk(isDayMode)
+    val labelColor = widgetSubInk(isDayMode)
 
     Column(
         modifier = modifier,
@@ -256,9 +259,9 @@ private fun DialGauge(
     isDayMode: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (isDayMode) Color(0xFFD6D6D6) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
-    val contentColor = if (isDayMode) Color(0xFF111111) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground
-    val labelColor = if (isDayMode) Color(0xFF666666) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    val trackColor = widgetLine(isDayMode)
+    val contentColor = widgetInk(isDayMode)
+    val labelColor = widgetSubInk(isDayMode)
 
     BoxWithConstraints(
         modifier = modifier,

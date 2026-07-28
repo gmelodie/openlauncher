@@ -18,6 +18,7 @@ import com.openlauncher.app.util.LocationData
 import com.openlauncher.app.util.speedIn
 import kotlin.math.cos
 import kotlin.math.sin
+import com.openlauncher.app.ui.theme.widgetInk
 
 @Composable
 fun SpeedometerWidget(
@@ -35,7 +36,7 @@ fun SpeedometerWidget(
     val tickAlphaMaj = if (isDayMode) 0.50f else 0.28f
     val tickAlphaMin = if (isDayMode) 0.25f else 0.13f
 
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
+    val contentColor = widgetInk(isDayMode)
     val subAlpha     = if (isDayMode) 0.55f else 0.32f
     val tickBaseColor = if (isDayMode) Color(0xFF222222) else MaterialTheme.colorScheme.onBackground
 
@@ -110,7 +111,7 @@ fun SpeedometerWidget(
                         color       = tickBaseColor.copy(alpha = if (isMajor) tickAlphaMaj else tickAlphaMin),
                         start       = Offset(cx + (outerR * cos(rad)).toFloat(), cy + (outerR * sin(rad)).toFloat()),
                         end         = Offset(cx + (innerR * cos(rad)).toFloat(), cy + (innerR * sin(rad)).toFloat()),
-                        strokeWidth = if (isMajor) 1.5.dp.toPx() else 0.8.dp.toPx()
+                        strokeWidth = if (isMajor) 2.4.dp.toPx() else 1.4.dp.toPx()
                     )
                 }
             }

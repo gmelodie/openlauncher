@@ -21,6 +21,8 @@ import com.openlauncher.app.util.METERS_TO_FEET
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.sqrt
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
 
 private const val NO_READING = "—"
 
@@ -36,8 +38,8 @@ fun AltimeterWidget(
     modifier: Modifier = Modifier
 ) {
     val iconTint = if (isDayMode) Color(0xFF333333) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-    val labelColor = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
-    val valueColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
+    val labelColor = widgetSubInk(isDayMode)
+    val valueColor = widgetInk(isDayMode)
 
     // The unit sits at a fixed angle in the dash. Tilt is therefore measured
     // against the gravity vector recorded while the vehicle stands level, not

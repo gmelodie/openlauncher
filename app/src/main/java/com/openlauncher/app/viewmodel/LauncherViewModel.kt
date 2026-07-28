@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.openlauncher.app.data.AppSettings
 import com.openlauncher.app.data.DayNightMode
 import com.openlauncher.app.data.DefaultShortcutIcon
+import com.openlauncher.app.data.GeoIpApi
 import com.openlauncher.app.data.GRID_COLS
 import com.openlauncher.app.data.GRID_ROWS
 import com.openlauncher.app.data.LevelReference
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.*
 
 private const val WEATHER_INTERVAL_MS = 30 * 60 * 1000L
 private const val WEATHER_RETRY_MS = 60 * 1000L
+private const val IP_POSITION_TTL_MS = 6 * 60 * 60 * 1000L
 private const val TRIP_FLUSH_MS = 15 * 1000L
 private const val ICON_CACHE_SIZE = 48
 
@@ -132,7 +134,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ── CarPlay / Android Auto picker ─────────────────────────────────────────
-    enum class AppPickerTarget { CARPLAY, ANDROID_AUTO, PIP, RADIO }
+    enum class AppPickerTarget { CARPLAY, ANDROID_AUTO, PIP, RADIO, NAV }
 
     private val _appPickerTarget = MutableStateFlow<AppPickerTarget?>(null)
     val appPickerTarget: StateFlow<AppPickerTarget?> = _appPickerTarget
@@ -157,12 +159,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _nav.value = NavDestination.APP_LIBRARY
     }
 
+    fun startNavPicker() {
+        _appPickerTarget.value = AppPickerTarget.NAV
+        _nav.value = NavDestination.APP_LIBRARY
+    }
+
     fun assignPickerApp(app: AppInfo) {
         when (_appPickerTarget.value) {
             AppPickerTarget.CARPLAY      -> updateSettings { copy(carPlayPackage = app.packageName) }
             AppPickerTarget.ANDROID_AUTO -> updateSettings { copy(androidAutoPackage = app.packageName) }
             AppPickerTarget.PIP          -> updateSettings { copy(pipAppPackage = app.packageName) }
             AppPickerTarget.RADIO        -> updateSettings { copy(radioPackage = app.packageName) }
+            AppPickerTarget.NAV          -> updateSettings { copy(navPackage = app.packageName) }
             null -> {}
         }
         _appPickerTarget.value = null
@@ -246,7 +254,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         "CLOCK"        -> copy(showClock = shown)
         "WEATHER"      -> copy(showWeather = shown)
         "NOW_PLAYING"  -> copy(showNowPlaying = shown)
-        "TELEMETRY"    -> copy(showTelemetry = shown)
+        "MAP"          -> copy(showMap = shown)
         "ALTIMETER"    -> copy(showAltimeter = shown)
         "SPEEDOMETER"  -> copy(showSpeedometer = shown)
         "VITALS"       -> copy(showVitals = shown)
@@ -436,6 +444,31 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
     }
 
+    // ── Navigation app ────────────────────────────────────────────────────────
+    fun navAppLabel(): String {
+        val pkg = settings.value.navPackage
+        if (pkg.isEmpty()) return "Navigation"
+        val pm = getApplication<Application>().packageManager
+        return runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }
+            .getOrDefault("Navigation")
+    }
+
+    // The map cell opens the chosen navigation app. When that app is absent, a
+    // geo: intent hands the current position to whatever else can take it.
+    fun launchNavApp() {
+        val pkg = settings.value.navPackage
+        if (pkg.isNotEmpty() && packageInstalled(pkg)) {
+            launchApp(pkg)
+            return
+        }
+        val loc = locationMgr.location.value
+        val geo = if (loc != null) "geo:${loc.latitude},${loc.longitude}" else "geo:0,0"
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(geo))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val started = runCatching { getApplication<Application>().startActivity(intent) }.isSuccess
+        if (!started) showToast("No navigation app installed")
+    }
+
     // ── Now Playing ───────────────────────────────────────────────────────────
     val nowPlaying: StateFlow<NowPlayingState?> = MediaListenerService.nowPlaying
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -457,6 +490,50 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private val _weatherError = MutableStateFlow<String?>(null)
     val weatherError: StateFlow<String?> = _weatherError
+
+    // Set while the reading comes from the IP address instead of a GPS fix, so
+    // the widget can name the city it actually describes.
+    private val _weatherPlace = MutableStateFlow<String?>(null)
+    val weatherPlace: StateFlow<String?> = _weatherPlace
+
+    private var ipPosition: LocationData? = null
+    private var ipPositionAtMs = 0L
+
+    // The IP address of a head unit changes only when it joins another network,
+    // and the answer is city-level anyway, so one lookup lasts hours.
+    private suspend fun weatherPosition(): LocationData? {
+        val fix = locationMgr.location.value
+        if (fix != null) {
+            _weatherPlace.value = null
+            return fix
+        }
+        val cached = ipPosition
+        if (cached != null && System.currentTimeMillis() - ipPositionAtMs < IP_POSITION_TTL_MS) return cached
+        return fetchIpPosition()
+    }
+
+    private suspend fun fetchIpPosition(): LocationData? {
+        for (endpoint in GeoIpApi.endpoints) {
+            val answer = try {
+                GeoIpApi.service.locate(endpoint)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                continue
+            }
+            if (!answer.isUsable) continue
+            val position = LocationData(
+                latitude  = answer.latitude ?: continue,
+                longitude = answer.longitude ?: continue,
+                altitude  = 0.0
+            )
+            ipPosition = position
+            ipPositionAtMs = System.currentTimeMillis()
+            _weatherPlace.value = answer.city
+            return position
+        }
+        return null
+    }
 
     private suspend fun fetchWeather(lat: Double, lon: Double): Boolean {
         return try {
@@ -759,16 +836,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     // A head unit starts before the network attaches, so a failed request must
-    // retry in a minute instead of holding the full refresh interval.
+    // retry in a minute instead of holding the full refresh interval. The loop
+    // runs on the clock, not on location updates: a unit with no GPS fix never
+    // emits one, and it still has to reach the IP fallback.
     private suspend fun runWeatherLoop() {
         var nextAttemptMs = 0L
-        merge(
-            locationMgr.location.filterNotNull(),
-            minuteTicker.mapNotNull { locationMgr.location.value }
-        ).collect { loc ->
+        merge(locationMgr.location.filterNotNull(), minuteTicker).collect {
             val now = System.currentTimeMillis()
             if (now < nextAttemptMs) return@collect
-            val ok = fetchWeather(loc.latitude, loc.longitude)
+            val position = weatherPosition()
+            if (position == null) {
+                _weatherError.value = "No location"
+                nextAttemptMs = now + WEATHER_RETRY_MS
+                return@collect
+            }
+            val ok = fetchWeather(position.latitude, position.longitude)
             nextAttemptMs = now + if (ok) WEATHER_INTERVAL_MS else WEATHER_RETRY_MS
         }
     }

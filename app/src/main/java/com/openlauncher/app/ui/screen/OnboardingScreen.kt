@@ -373,7 +373,7 @@ private fun IntroStep(accent: Color, titleText: Color, bodyText: Color, mutedTex
         Spacer(Modifier.height(8.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            BulletItem(Icons.Default.CloudOff, "100% Offline-Based", "No reliance on a mobile signal or network connection to function. Speedometer, compass telemetry, and altimeter operate entirely offline.")
+            BulletItem(Icons.Default.CloudOff, "100% Offline-Based", "The speedometer, the altimeter and the trip tracker work with no mobile signal. The map and the weather need a connection.")
             BulletItem(Icons.Default.Palette, "Highly Customizable Dashboard", "Tailor color accents, background gradients, typography fonts, system units, and drag-and-drop to rearrange your tiles.")
             BulletItem(Icons.Default.VolumeUp, "Soundboard & Media Shortcuts", "Trigger custom soundboard sound effects, manage CarPlay & Android Auto shortcuts, and control active media players.")
         }
@@ -392,7 +392,7 @@ private fun LocationStep(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = "TELEMETRY & WEATHER",
+            text = "LOCATION & WEATHER",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = accent,
@@ -400,7 +400,7 @@ private fun LocationStep(
             fontSize = 20.sp
         )
         Text(
-            text = "To compute your real-time speed, compass bearing, altitude telemetry, and update local weather conditions, Open Launcher requires high-precision GPS services.",
+            text = "Open Launcher needs GPS to show your speed, your altitude and your position on the map. Without a fix it still shows the weather for the city of your connection.",
             color = bodyText,
             fontSize = 13.sp,
             lineHeight = 20.sp
@@ -433,7 +433,7 @@ private fun LocationStep(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (isGranted) "GPS telemetry is active and ready." else "Telemetry is currently disabled.",
+                        text = if (isGranted) "GPS is active and ready." else "GPS is currently disabled.",
                         color = mutedText,
                         fontSize = 11.sp
                     )

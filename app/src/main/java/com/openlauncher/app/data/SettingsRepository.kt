@@ -40,11 +40,24 @@ class SettingsRepository(private val context: Context) {
 
     private fun readSettings(prefs: Preferences): AppSettings {
         val stored = prefs[SETTINGS_JSON]
-            ?: return LegacySettings.read(prefs).sanitized()
+            ?: return LegacySettings.read(prefs).migrated().sanitized()
         return runCatching { json.decodeFromString<AppSettings>(stored) }
             .getOrDefault(AppSettings())
+            .migrated()
             .sanitized()
     }
+}
+
+// Version 2 turned the compass cell into a map and made textScale reach every
+// label. A scale picked against the old behaviour reads far too large now, so it
+// goes back to the default once.
+internal fun AppSettings.migrated(): AppSettings {
+    if (settingsVersion >= CURRENT_SETTINGS_VERSION) return this
+    return copy(
+        widgetLayout = widgetLayout.map { if (it.id == "TELEMETRY") it.copy(id = "MAP") else it },
+        textScale = AppSettings().textScale,
+        settingsVersion = CURRENT_SETTINGS_VERSION
+    )
 }
 
 private fun AppSettings.sanitized(): AppSettings {
@@ -56,9 +69,9 @@ private fun AppSettings.sanitized(): AppSettings {
         widgetLayout = layout.ifEmpty { defaultWidgetLayout() },
         shortcuts = shortcuts.ifEmpty { defaultShortcuts() },
         soundboardPads = soundboardPads.ifEmpty { defaultSoundboardPads() },
-        textScale = textScale.coerceIn(0.5f, 2.0f),
+        textScale = textScale.coerceIn(0.8f, 1.8f),
         uiScale = uiScale.coerceIn(0.5f, 2.0f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 1f),
-        compassOffset = compassOffset.coerceIn(-180f, 180f)
+        mapZoom = mapZoom.coerceIn(MIN_MAP_ZOOM, MAX_MAP_ZOOM)
     )
 }

@@ -109,14 +109,16 @@ data class AppSettings(
     val fontColor: Int = GRUVBOX_LIGHT_INK,
     val wallpaperUri: String = "",
     val fontBold: Boolean = false,
-    val textScale: Float = 1.2f,
+    // textScale drives the font scale of the whole launcher, so it reaches every
+    // label, not only the ones styled from MaterialTheme.typography.
+    val textScale: Float = 1.3f,
     val uiScale: Float = 1.0f,
     val clockStyle: ClockStyle = ClockStyle.DIGITAL,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val appFont: AppFont = AppFont.JETBRAINS_MONO,
     val showWeather: Boolean = true,
     val showClock: Boolean = true,
-    val showTelemetry: Boolean = true,
+    val showMap: Boolean = true,
     val showNowPlaying: Boolean = true,
     val shortcuts: List<ShortcutConfig> = defaultShortcuts(),
     val widgetLayout: List<WidgetConfig> = defaultWidgetLayout(),
@@ -137,7 +139,6 @@ data class AppSettings(
     val onboardingCompleted: Boolean = false,
     val showVitals: Boolean = false,
     val showTripTracker: Boolean = false,
-    val compassOffset: Float = 0f,
     val showSoundboard: Boolean = false,
     val soundboardPads: List<SoundPadConfig> = defaultSoundboardPads(),
     val vitalsAsBars: Boolean = false,
@@ -148,8 +149,16 @@ data class AppSettings(
     val radioPresets: RadioPresets = RadioPresets(),
     // Gravity vector recorded while the vehicle stands level. All zero means the
     // altimeter must capture a fresh reference on its next reading.
-    val levelReference: LevelReference = LevelReference()
+    val levelReference: LevelReference = LevelReference(),
+    val mapZoom: Int = 16,
+    val navPackage: String = "com.waze",
+    // Raised by SettingsRepository when a stored value needs a one-off rewrite.
+    val settingsVersion: Int = 1
 )
+
+const val CURRENT_SETTINGS_VERSION = 2
+const val MIN_MAP_ZOOM = 12
+const val MAX_MAP_ZOOM = 18
 
 @Serializable
 data class TripState(
@@ -191,7 +200,7 @@ fun defaultShortcuts() = listOf(
 fun defaultWidgetLayout() = listOf(
     WidgetConfig("CLOCK",       gridX = 0, gridY = 0, spanX = 1, spanY = 1),
     WidgetConfig("WEATHER",     gridX = 1, gridY = 0, spanX = 1, spanY = 1),
-    WidgetConfig("TELEMETRY",   gridX = 2, gridY = 0, spanX = 1, spanY = 2),
+    WidgetConfig("MAP",         gridX = 2, gridY = 0, spanX = 1, spanY = 2),
     WidgetConfig("NOW_PLAYING", gridX = 0, gridY = 1, spanX = 2, spanY = 1)
 )
 
@@ -199,7 +208,7 @@ fun AppSettings.activeWidgetIds(): Set<String> = buildSet {
     if (showClock) add("CLOCK")
     if (showWeather) add("WEATHER")
     if (showNowPlaying) add("NOW_PLAYING")
-    if (showTelemetry) add("TELEMETRY")
+    if (showMap) add("MAP")
     if (showAltimeter) add("ALTIMETER")
     if (showSpeedometer) add("SPEEDOMETER")
     if (showVitals) add("VITALS")

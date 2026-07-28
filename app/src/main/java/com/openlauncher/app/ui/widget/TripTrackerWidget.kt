@@ -24,6 +24,11 @@ import com.openlauncher.app.util.LocationData
 import com.openlauncher.app.util.METERS_TO_MILES
 import com.openlauncher.app.util.speedIn
 import kotlinx.coroutines.delay
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg3
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
+import com.openlauncher.app.ui.theme.widgetLine
 
 private const val MODE_TRIP = "TRIP"
 private const val MODE_ACCEL = "0-100"
@@ -43,11 +48,11 @@ fun TripTrackerWidget(
     isDayMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val displayColor = if (isDayMode) Color(0xFF111111) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+    val displayColor = widgetInk(isDayMode)
     val dimDisplayColor = if (isDayMode) Color(0xFF111111).copy(alpha = 0.08f) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
 
-    val lcdBorder = if (isDayMode) Color(0xFFCCCCCC) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
-    val labelColor = if (isDayMode) Color(0xFF888888) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
+    val lcdBorder = widgetLine(isDayMode)
+    val labelColor = widgetSubInk(isDayMode)
 
     val activeAccent = accent
     val teRed = Color(0xFFFF2D55)
@@ -439,16 +444,16 @@ private fun TeTactileButton(
     onClick: () -> Unit,
     isDayMode: Boolean
 ) {
-    val printedLabelColor = if (isDayMode) Color(0xFF666666) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    val printedLabelColor = widgetSubInk(isDayMode)
 
     val buttonBg = when {
         !enabled  -> Color.Transparent
         active    -> keyColor
-        isDayMode -> Color(0xFFE5E7EB)
+        isDayMode -> GruvLightBg1
         else      -> Color(0xFF1D2024)
     }
 
-    val buttonBorder = if (isDayMode) Color(0xFFD1D5DB) else Color(0xFF2E3238)
+    val buttonBorder = if (isDayMode) GruvLightBg3 else Color(0xFF2E3238)
     val dotColor = when {
         active  -> if (isDayMode) Color.White else Color.Black
         enabled -> keyColor

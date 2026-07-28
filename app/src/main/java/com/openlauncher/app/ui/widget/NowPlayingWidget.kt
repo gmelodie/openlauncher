@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import com.openlauncher.app.data.RadioPresets
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
+import com.openlauncher.app.ui.theme.GruvLightBg3
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -41,6 +42,9 @@ import com.openlauncher.app.model.NowPlayingState
 import com.openlauncher.app.service.MediaListenerService
 import kotlin.math.abs
 import kotlinx.coroutines.delay
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
+import com.openlauncher.app.ui.theme.widgetLine
 
 private enum class MediaSource { PLAYER, RADIO }
 
@@ -155,7 +159,7 @@ fun NowPlayingWidget(
                 )
             }
             val dropdownBg   = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
-            val dropdownText = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
+            val dropdownText = widgetInk(isDayMode)
             DropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
@@ -207,9 +211,9 @@ private fun RadioDeck(
     onAssignRadio: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val dimColor     = if (isDayMode) Color(0xFF444444) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-    val borderColor  = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f)
+    val contentColor = widgetInk(isDayMode)
+    val dimColor     = widgetSubInk(isDayMode)
+    val borderColor  = widgetLine(isDayMode)
 
     if (hardwareRadio == null) {
         // No real tuner detected — be honest about it instead of simulating one
@@ -415,7 +419,7 @@ private fun RadioDeck(
                     val presetBorderColor = when {
                         isTuned && isDayMode -> Color(0xFF222222)
                         isTuned              -> accent
-                        isDayMode            -> Color(0xFFCCCCCC)
+                        isDayMode            -> GruvLightBg3
                         else                 -> Color(0xFF1D2024)
                     }
                     val presetNumColor = when {
@@ -600,8 +604,8 @@ private fun StandardMinimalPlayer(
             val hasAlbumArt = nonNullState.albumArt != null
             val onArtwork = hasAlbumArt || !isDayMode
 
-            val currentTextColor = if (hasAlbumArt) Color.White else if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-            val currentSubTextColor = if (hasAlbumArt) Color.White.copy(alpha = 0.6f) else if (isDayMode) Color(0xFF666666) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            val currentTextColor = if (hasAlbumArt) Color.White else widgetInk(isDayMode)
+            val currentSubTextColor = if (hasAlbumArt) Color.White.copy(alpha = 0.6f) else widgetSubInk(isDayMode)
             val currentProgressColor = if (onArtwork) accent else Color(0xFF111111)
             val currentProgressTrack = currentTextColor.copy(alpha = 0.15f)
             val currentIconColor = currentTextColor.copy(alpha = 0.75f)

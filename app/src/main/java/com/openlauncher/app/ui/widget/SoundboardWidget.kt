@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.openlauncher.app.data.SoundPadConfig
+import com.openlauncher.app.ui.theme.widgetInk
+import com.openlauncher.app.ui.theme.widgetSubInk
+import com.openlauncher.app.ui.theme.widgetLine
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -50,9 +53,9 @@ fun SoundboardWidget(
     modifier: Modifier = Modifier
 ) {
     val context      = LocalContext.current
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val dimColor     = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-    val borderColor  = if (isDayMode) Color(0xFFE5E7EB) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f)
+    val contentColor = widgetInk(isDayMode)
+    val dimColor     = widgetSubInk(isDayMode)
+    val borderColor  = widgetLine(isDayMode)
 
     var activePadIndex by remember { mutableStateOf<Int?>(null) }
     var assigningIndex by remember { mutableStateOf<Int?>(null) }
@@ -153,10 +156,10 @@ private fun PadAssignDialog(
 ) {
     val context    = LocalContext.current
     val menuBg     = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
-    val menuBorder = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f)
-    val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val dimColor   = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-    val fieldBorder = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
+    val menuBorder = widgetLine(isDayMode)
+    val contentColor = widgetInk(isDayMode)
+    val dimColor   = widgetSubInk(isDayMode)
+    val fieldBorder = widgetLine(isDayMode)
 
     var labelText   by remember { mutableStateOf(if (pad.isAssigned) pad.label else "") }
     var soundName   by remember { mutableStateOf(pad.soundName) }

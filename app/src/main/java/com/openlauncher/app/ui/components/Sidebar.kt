@@ -408,9 +408,9 @@ private fun IconPickerDialog(
     val surface  = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
     val outline  = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
     val divider  = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
-    val labelC   = if (isDayMode) GruvLightFg3 else Color(0xFF888888)
+    val labelC   = if (isDayMode) GruvLightFg3 else Color(0xFFA89984)
     val tileBg   = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
-    val tileTint = if (isDayMode) GruvLightFg1 else Color(0xFF888888)
+    val tileTint = if (isDayMode) GruvLightFg1 else Color(0xFFA89984)
 
     Dialog(onDismissRequest = onDismiss) {
         Column(

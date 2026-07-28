@@ -18,7 +18,6 @@ fun OpenLauncherTheme(
     background: Color = GruvDarkBg0,
     textColor: Color  = Color.White,
     fontBold: Boolean = false,
-    textScale: Float  = 1.0f,
     appFont: AppFont  = AppFont.JETBRAINS_MONO,
     isDayMode: Boolean = false,
     useCustomBg: Boolean = false,
@@ -57,7 +56,7 @@ fun OpenLauncherTheme(
     CompositionLocalProvider(LocalDayMode provides isDayMode) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography  = launcherTypography(fontBold, textScale, appFont.toFontFamily()),
+            typography  = launcherTypography(fontBold, appFont.toFontFamily()),
             content     = content
         )
     }

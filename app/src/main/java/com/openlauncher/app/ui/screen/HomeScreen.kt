@@ -52,6 +52,7 @@ import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.GruvLightFg1
+import com.openlauncher.app.ui.theme.GruvLightFg3
 import com.openlauncher.app.ui.widget.*
 import com.openlauncher.app.util.LocationData
 import com.openlauncher.app.viewmodel.LauncherViewModel
@@ -71,11 +72,11 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("CLOCK",       "CLOCK",       Icons.Default.AccessTime,  "Time & date"),
     WidgetTypeInfo("WEATHER",     "WEATHER",     Icons.Default.Cloud,       "Current conditions"),
     WidgetTypeInfo("NOW_PLAYING", "NOW PLAYING", Icons.Default.MusicNote,   "Media controls"),
-    WidgetTypeInfo("TELEMETRY",   "COMPASS",     Icons.Default.Explore,     "Speed & heading"),
+    WidgetTypeInfo("MAP",         "MAP",         Icons.Default.Map,         "Live map & navigation"),
     WidgetTypeInfo("ALTIMETER",   "ALTIMETER",   Icons.Default.FlightTakeoff, "Roll, pitch & altitude"),
     WidgetTypeInfo("SPEEDOMETER", "SPEED",       Icons.Default.Speed,         "GPS speed"),
     WidgetTypeInfo("VITALS",      "VITALS",      Icons.Default.Dns,           "Head Unit Health / Vitals"),
-    WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
+    WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Timeline,     "Trip logs & stats"),
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads")
 )
 
@@ -92,6 +93,7 @@ fun HomeScreen(
     settings: AppSettings,
     weather: WeatherState?,
     weatherError: String?,
+    weatherPlace: String? = null,
     nowPlaying: NowPlayingState?,
     location: LocationData?,
     gravity: FloatArray?,
@@ -118,6 +120,10 @@ fun HomeScreen(
     onAddWidget: (id: String) -> Unit,
     onRemoveWidget: (id: String) -> Unit,
     onSetClockStyle: (ClockStyle) -> Unit,
+    onOpenNav: () -> Unit = {},
+    onAssignNav: () -> Unit = {},
+    onSetMapZoom: (Int) -> Unit = {},
+    navLabel: String = "NAVIGATION",
     onSetVitalsAsBars: (Boolean) -> Unit = {},
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit = {},
     onUpdateSoundPad: (index: Int, pad: SoundPadConfig) -> Unit = { _, _ -> },
@@ -153,8 +159,8 @@ fun HomeScreen(
         else         -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
     }
     val headerTextColor   = if (isDayMode) GruvLightFg1 else accent
-    val statusIconColor   = if (isDayMode) Color(0xFF444444) else Color(0xFF666666)
-    val controlIconColor  = if (isDayMode) Color(0xFF666666) else Color(0xFF444444)
+    val statusIconColor   = if (isDayMode) GruvLightFg1 else Color(0xFF888888)
+    val controlIconColor  = if (isDayMode) GruvLightFg3 else Color(0xFF777777)
 
     var resizingId    by remember { mutableStateOf<String?>(null) }
     var contextMenuId by remember { mutableStateOf<String?>(null) }
@@ -309,7 +315,7 @@ fun HomeScreen(
                     "CLOCK"       -> clockTimeLabel(now, locale)
                     "WEATHER"     -> "WEATHER"
                     "NOW_PLAYING" -> "NOW PLAYING"
-                    "TELEMETRY"   -> "COMPASS"
+                    "MAP"         -> "MAP"
                     "ALTIMETER"   -> "ALTIMETER"
                     "SPEEDOMETER" -> "SPEED"
                     "TRIP_TRACKER" -> "TRIP"
@@ -401,6 +407,7 @@ fun HomeScreen(
                             accent     = accent,
                             metric     = isMetric,
                             error      = weatherError,
+                            place      = weatherPlace,
                             isDayMode  = isDayMode,
                             modifier   = Modifier.fillMaxSize()
                         )
@@ -430,11 +437,17 @@ fun HomeScreen(
                             onRadioTune           = onRadioTune,
                             onAssignRadio         = onAssignRadio
                         )
-                        "TELEMETRY" -> TelemetryWidget(
+                        "MAP" -> MapWidget(
                             location  = location,
-                            bearing   = (bearing + settings.compassOffset + 360f) % 360f,
+                            bearing   = bearing,
+                            zoom      = settings.mapZoom,
+                            isMetric  = isMetric,
                             accent    = accent,
+                            navLabel  = navLabel,
+                            isEditing = editMode,
                             isDayMode = isDayMode,
+                            onOpenNav = onOpenNav,
+                            onZoomChange = onSetMapZoom,
                             modifier  = Modifier.fillMaxSize()
                         )
                         "ALTIMETER" -> AltimeterWidget(
@@ -487,15 +500,15 @@ fun HomeScreen(
                     val labelColor = when {
                         isGhost -> Color.Transparent
                         w.id == "NOW_PLAYING" && nowPlaying?.albumArt != null && nowPlaying.title.isNotEmpty() -> Color.Transparent
-                        isDayMode -> Color(0xFF999999)
-                        else      -> Color(0xFF3A3A3A)
+                        isDayMode -> GruvLightFg3
+                        else      -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
                     }
                     Text(
                         text          = label,
                         style         = MaterialTheme.typography.labelSmall,
                         color         = labelColor,
                         letterSpacing = 2.sp,
-                        fontSize      = 8.sp,
+                        fontSize      = 10.sp,
                         modifier      = Modifier
                             .align(Alignment.TopStart)
                             .padding(start = 10.dp, top = 7.dp)
@@ -524,6 +537,7 @@ fun HomeScreen(
             onClearAndroidAuto  = { contextMenuId = null; onClearAndroidAuto() },
             onAssignPip         = { contextMenuId = null; onAssignPip() },
             onClearPip          = { contextMenuId = null; onClearPip() },
+            onAssignNav         = { contextMenuId = null; onAssignNav() },
             onSetClockStyle     = { onSetClockStyle(it) },
             onSetVitalsAsBars   = { onSetVitalsAsBars(it) },
             onSetSpeedometerDigitalOnly = { onSetSpeedometerDigitalOnly(it) },
@@ -579,6 +593,7 @@ private fun WidgetContextMenu(
     onClearAndroidAuto: () -> Unit,
     onAssignPip: () -> Unit,
     onClearPip: () -> Unit,
+    onAssignNav: () -> Unit,
     onSetClockStyle: (ClockStyle) -> Unit,
     onSetVitalsAsBars: (Boolean) -> Unit,
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit,
@@ -635,6 +650,10 @@ private fun WidgetContextMenu(
                     onSetSpeedometerDigitalOnly(true); onDismiss()
                 }
             }
+            if (widgetId == "MAP") {
+                HorizontalDivider(color = menuDivider)
+                row("ASSIGN NAVIGATION APP", Icons.Default.Navigation, ContextTone.ACTION, onAssignNav)
+            }
             if (widgetId == "NOW_PLAYING") {
                 HorizontalDivider(color = menuDivider)
                 row("ASSIGN CARPLAY APP", Icons.Default.PhoneAndroid, ContextTone.ACTION, onAssignCarPlay)
@@ -669,7 +688,7 @@ private fun ContextRow(
     val finalTint = when (tone) {
         ContextTone.DANGER   -> Color(0xFF884444)
         ContextTone.SELECTED -> accent
-        ContextTone.INACTIVE -> if (isDayMode) Color(0xFF888888) else Color(0xFF555555)
+        ContextTone.INACTIVE -> if (isDayMode) GruvLightFg3 else Color(0xFF777777)
         ContextTone.ACTION   -> if (isDayMode) Color(0xFF111111) else accent
     }
     Row(
