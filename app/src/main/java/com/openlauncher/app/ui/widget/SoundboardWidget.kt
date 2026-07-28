@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.openlauncher.app.ui.theme.GruvLightBg1
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -147,7 +148,7 @@ private fun PadAssignDialog(
     onSave: (SoundPadConfig) -> Unit
 ) {
     val context    = LocalContext.current
-    val menuBg     = if (isDayMode) Color(0xFFF0F0F0) else MaterialTheme.colorScheme.background
+    val menuBg     = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
     val menuBorder = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f)
     val contentColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
     val dimColor   = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)

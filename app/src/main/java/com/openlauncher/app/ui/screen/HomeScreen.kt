@@ -41,6 +41,11 @@ import com.openlauncher.app.data.GRID_ROWS
 import com.openlauncher.app.data.WidgetConfig
 import com.openlauncher.app.model.NowPlayingState
 import com.openlauncher.app.model.WeatherState
+import com.openlauncher.app.ui.theme.GruvLightBg0
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg2
+import com.openlauncher.app.ui.theme.GruvLightBg3
+import com.openlauncher.app.ui.theme.GruvLightFg1
 import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.ui.widget.*
 import java.util.Calendar
@@ -139,16 +144,16 @@ fun HomeScreen(
     val gap          = 6.dp
     val hasWallpaper = settings.wallpaperUri.isNotEmpty()
     val widgetBg     = when {
-        isDayMode    -> Color(0xFFFFFFFF)
+        isDayMode    -> GruvLightBg1
         hasWallpaper -> Color(0xCC000000)
         else         -> Color.Black.copy(alpha = 0.35f)
     }
     val widgetBorder = when {
-        isDayMode    -> Color(0xFFCCCCCC)
+        isDayMode    -> GruvLightBg3
         hasWallpaper -> Color(0x22FFFFFF)
         else         -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
     }
-    val headerTextColor   = if (isDayMode) Color(0xFF111111) else accent
+    val headerTextColor   = if (isDayMode) GruvLightFg1 else accent
     val statusIconColor   = if (isDayMode) Color(0xFF444444) else Color(0xFF666666)
     val controlIconColor  = if (isDayMode) Color(0xFF666666) else Color(0xFF444444)
 
@@ -215,7 +220,7 @@ fun HomeScreen(
             }
         }
 
-        HorizontalDivider(color = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF141414))
+        HorizontalDivider(color = if (isDayMode) GruvLightBg3 else Color(0xFF141414))
 
         // ── Widget Grid ─────────────────────────────────────────────────────
         BoxWithConstraints(
@@ -577,9 +582,9 @@ private fun WidgetContextMenu(
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val menuBg    = if (isDayMode) Color(0xFFFFFFFF) else Color(0xFF111111)
-    val menuBorder = if (isDayMode) Color(0xFFDDE1E5) else Color(0xFF1E1E1E)
-    val menuDivider = if (isDayMode) Color(0xFFF1F3F5) else Color(0xFF1A1A1A)
+    val menuBg    = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
+    val menuBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
+    val menuDivider = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -710,8 +715,8 @@ private fun WidgetResizeDialog(
     val maxSpanX = GRID_COLS - config.gridX
     val maxSpanY = GRID_ROWS - config.gridY
 
-    val dialogBg     = if (isDayMode) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.background
-    val dialogText   = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
+    val dialogBg     = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
+    val dialogText   = if (isDayMode) GruvLightFg1 else MaterialTheme.colorScheme.onBackground
     val cancelColor  = if (isDayMode) Color(0xFF6C757D) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -824,8 +829,8 @@ private fun WidgetLibraryDialog(
     onRemove: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val dialogBg    = if (isDayMode) Color(0xFFEEEEEE) else Color(0xFF0C0C0C)
-    val dialogBorder = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1E1E1E)
+    val dialogBg    = if (isDayMode) GruvLightBg1 else Color(0xFF0C0C0C)
+    val dialogBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
     val titleColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF555555)
     val closeColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF444444)
 
@@ -912,7 +917,7 @@ private fun WidgetLibraryCard(
 ) {
     val enabled    = isActive || canAdd
     val cardBorder = if (isActive) accent else if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1A1A1A)
-    val cardBg     = if (isActive) accent.copy(alpha = 0.15f) else if (isDayMode) Color(0xFFFFFFFF) else Color(0xFF0E0E0E)
+    val cardBg     = if (isActive) accent.copy(alpha = 0.15f) else if (isDayMode) GruvLightBg0 else Color(0xFF0E0E0E)
     val iconTint   = if (isActive) accent else if (isDayMode) Color(0xFF495057) else Color(0xFF333333)
     val labelColor = if (isActive) accent else if (isDayMode) Color(0xFF212529) else Color(0xFF3A3A3A)
 

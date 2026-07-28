@@ -39,6 +39,8 @@ import com.openlauncher.app.data.AppSettings
 import com.openlauncher.app.data.DefaultShortcutIcon
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.model.NavDestination
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.LocalDayMode
 import kotlin.math.roundToInt
 
@@ -61,9 +63,9 @@ fun Sidebar(
 ) {
     val isDayMode    = LocalDayMode.current
     val accent       = Color(settings.accentColor)
-    val sidebarBg    = if (isDayMode) Color(0xFFE0E0E0) else Color.Black.copy(alpha = 0.4f)
+    val sidebarBg    = if (isDayMode) GruvLightBg1 else Color.Black.copy(alpha = 0.4f)
     val iconInactive = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-    val dividerColor = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+    val dividerColor = if (isDayMode) GruvLightBg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
     val density      = LocalDensity.current
     val slotSizePx   = with(density) { SLOT_SIZE.toPx() }
 
@@ -546,6 +548,7 @@ fun DefaultShortcutIcon.toIcon(): ImageVector = when (this) {
     // General utility
     DefaultShortcutIcon.TV          -> Icons.Default.Tv
     DefaultShortcutIcon.VIDEOCAM    -> Icons.Default.Videocam
+    DefaultShortcutIcon.MOVIE       -> Icons.Default.Movie
     DefaultShortcutIcon.STAR        -> Icons.Default.Star
     DefaultShortcutIcon.MESSAGE     -> Icons.Default.Message
     DefaultShortcutIcon.TIMER       -> Icons.Default.Timer

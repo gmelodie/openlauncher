@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg2
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -156,7 +158,7 @@ fun NowPlayingWidget(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            val dropdownBg   = if (isDayMode) Color(0xFFF0F0F0) else MaterialTheme.colorScheme.background
+            val dropdownBg   = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
             val dropdownText = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
             DropdownMenu(
                 expanded = menuExpanded,
@@ -268,7 +270,7 @@ private fun RadioDeck(
     val displayFreq = freqClean.ifEmpty { hardwareRadio.freq }
     val displayUnit = if (hardwareRadio.isAm) "kHz" else "MHz"
 
-    val chipInactiveBg = if (isDayMode) Color(0xFFE0E0E0) else Color(0xFF1A1A1A)
+    val chipInactiveBg = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
     val chipActiveBg   = if (isDayMode) Color(0xFF222222) else Color(0xFFDDDDDD)
     val chipActiveText = if (isDayMode) Color.White else Color(0xFF111111)
 

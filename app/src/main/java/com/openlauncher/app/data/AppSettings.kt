@@ -21,7 +21,7 @@ enum class DefaultShortcutIcon {
     // Lighting & climate
     LIGHTBULB, BRIGHTNESS, AC, THERMOSTAT,
     // General utility
-    TV, VIDEOCAM, STAR, MESSAGE, TIMER, LOCK, SETTINGS, FAVORITE,
+    TV, VIDEOCAM, MOVIE, STAR, MESSAGE, TIMER, LOCK, SETTINGS, FAVORITE,
     // Web / location
     GLOBE
 }
@@ -63,10 +63,13 @@ data class WidgetConfig(
 )
 
 data class AppSettings(
-    val vehicleName: String = "MY CAR",
-    val accentColor: Int = Color.White.toArgb(),
-    val backgroundColor: Int = Color.Black.toArgb(),
-    val fontColor: Int = Color.White.toArgb(),
+    val vehicleName: String = "HB20",
+    // Gruvbox defaults — mirror ui.theme.Color. Accent (orange) shows in both
+    // modes; fontColor is the night-mode ink (cream), so it must stay light —
+    // day mode draws its own dark ink and never reads fontColor.
+    val accentColor: Int = Color(0xFFD65D0E).toArgb(),
+    val backgroundColor: Int = Color(0xFFFBF1C7).toArgb(),
+    val fontColor: Int = Color(0xFFEBDBB2).toArgb(),
     val wallpaperUri: String = "",
     val fontBold: Boolean = false,
     val textScale: Float = 1.2f,
@@ -89,7 +92,7 @@ data class AppSettings(
     val bottomBarShortcutsRight: Boolean = false,
     val showAltimeter: Boolean = false,
     val showSpeedometer: Boolean = false,
-    val dayNightMode: DayNightMode = DayNightMode.DARK,
+    val dayNightMode: DayNightMode = DayNightMode.LIGHT,
     val showPip: Boolean = false,
     val pipAppPackage: String = "",
     // Head unit's radio app — mirrored & controlled via its MediaSession
@@ -106,11 +109,15 @@ data class AppSettings(
     val useCustomBackgroundColor: Boolean = false
 )
 
+// Pre-wired to the driver's most-used apps. packageName launches directly when
+// the app is installed; when it is not, the slot falls back to its default
+// vector icon and a long-press lets the driver rebind it to any installed app.
 fun defaultShortcuts() = listOf(
-    ShortcutConfig(label = "Radio", isDefault = true, defaultIcon = DefaultShortcutIcon.RADIO),
-    ShortcutConfig(label = "Camera", isDefault = true, defaultIcon = DefaultShortcutIcon.CAMERA),
-    ShortcutConfig(label = "Music", isDefault = true, defaultIcon = DefaultShortcutIcon.MUSIC),
-    ShortcutConfig(label = "Phone", isDefault = true, defaultIcon = DefaultShortcutIcon.PHONE)
+    ShortcutConfig(packageName = "com.waze",                 label = "Waze",    isDefault = true, defaultIcon = DefaultShortcutIcon.NAVIGATION),
+    ShortcutConfig(packageName = "com.spotify.music",        label = "Spotify", isDefault = true, defaultIcon = DefaultShortcutIcon.MUSIC),
+    ShortcutConfig(packageName = "org.schabi.newpipe",       label = "NewPipe", isDefault = true, defaultIcon = DefaultShortcutIcon.VIDEOCAM),
+    ShortcutConfig(packageName = "com.google.android.youtube", label = "YouTube", isDefault = true, defaultIcon = DefaultShortcutIcon.TV),
+    ShortcutConfig(packageName = "dev.jdtech.jellyfin",      label = "Jellyfin", isDefault = true, defaultIcon = DefaultShortcutIcon.MOVIE)
 )
 
 fun defaultWidgetLayout() = listOf(

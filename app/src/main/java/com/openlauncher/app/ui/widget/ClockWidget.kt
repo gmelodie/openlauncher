@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import com.openlauncher.app.ui.theme.GruvLightBg2
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -80,7 +81,7 @@ private fun AnalogClock(cal: Calendar, accent: Color, isDayMode: Boolean = false
 
     val ringColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF2A2A2A)
     val minuteHandColor = if (isDayMode) Color(0xFF222222) else MaterialTheme.colorScheme.onBackground
-    val pivotBg = if (isDayMode) Color(0xFFEEEEEE) else Color(0xFF1E1E1E)
+    val pivotBg = if (isDayMode) GruvLightBg2 else Color(0xFF1E1E1E)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {

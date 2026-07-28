@@ -26,6 +26,9 @@ import com.openlauncher.app.data.GradientDirection
 import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.ui.components.Sidebar
 import com.openlauncher.app.ui.screen.*
+import com.openlauncher.app.ui.theme.GruvDarkBg0
+import com.openlauncher.app.ui.theme.GruvLightBg0
+import com.openlauncher.app.ui.theme.GruvLightFg1
 import com.openlauncher.app.ui.theme.OpenLauncherTheme
 import com.openlauncher.app.viewmodel.LauncherViewModel
 
@@ -82,9 +85,9 @@ class MainActivity : ComponentActivity() {
             val bg             = if (settings.useCustomBackgroundColor) {
                 Color(settings.backgroundColor)
             } else {
-                if (isDayMode) Color(0xFFEEEEEE) else Color.Black
+                if (isDayMode) GruvLightBg0 else GruvDarkBg0
             }
-            val textColor      = if (isDayMode) Color(0xFF111111) else Color(settings.fontColor)
+            val textColor      = if (isDayMode) GruvLightFg1 else Color(settings.fontColor)
             val bgGradientEnd  = Color(settings.gradientEndColor)
             val bgBrush        = if (settings.useCustomBackgroundColor && settings.useGradient) {
                 val colors = listOf(bg, bgGradientEnd)
@@ -104,7 +107,7 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 if (!settingsLoaded) {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                    Box(modifier = Modifier.fillMaxSize().background(GruvLightBg0))
                 } else OpenLauncherTheme(
                     accent     = accent,
                     background = bg,

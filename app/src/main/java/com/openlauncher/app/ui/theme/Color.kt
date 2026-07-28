@@ -2,20 +2,38 @@ package com.openlauncher.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Black       = Color(0xFF000000)
-val White       = Color(0xFFFFFFFF)
-val DimSurface  = Color(0xFF0D0D0D)
-val CardSurface = Color(0xFF141414)
-val DividerGray = Color(0xFF2A2A2A)
-val TextMuted   = Color(0xFF888888)
+// ── Gruvbox palette ─────────────────────────────────────────────────────────
+// The launcher's native look. Light surfaces drive the default day theme;
+// the dark ramp backs forced/auto night mode. Names follow the upstream
+// gruvbox scale (bg0 = base, higher = further from the base).
 
-// Preset accent colours
-val AccentBlack = Color(0xFF000000)
-val AccentWhite = Color(0xFFFFFFFF)
-val AccentBlue  = Color(0xFF2979FF)
-val AccentGreen = Color(0xFF00E676)
-val AccentAmber = Color(0xFFFFAB00)
-val AccentRed   = Color(0xFFFF1744)
+// Light ramp (cream base, dark ink)
+val GruvLightBg0   = Color(0xFFFBF1C7) // base background
+val GruvLightBg1   = Color(0xFFEBDBB2) // raised surface
+val GruvLightBg2   = Color(0xFFD5C4A1) // higher surface
+val GruvLightBg3   = Color(0xFFBDAE93) // borders / outlines
+val GruvLightFg1   = Color(0xFF3C3836) // body text
+val GruvLightFg3   = Color(0xFF665C54) // muted text
 
-val accentPresets      = listOf(AccentBlack, AccentWhite, AccentBlue, AccentGreen, AccentAmber, AccentRed)
-val accentPresetLabels = listOf("Black", "White", "Blue", "Green", "Amber", "Red")
+// Dark ramp (charcoal base, cream ink)
+val GruvDarkBg0    = Color(0xFF282828)
+val GruvDarkBg1    = Color(0xFF3C3836)
+val GruvDarkBg2    = Color(0xFF504945)
+val GruvDarkGray   = Color(0xFF928374)
+
+// Neutral (dark) surfaces reused by dropdowns and the always-dark colour picker
+val DimSurface  = GruvDarkBg1
+val CardSurface = GruvDarkBg1
+val DividerGray = GruvDarkBg2
+val TextMuted   = GruvDarkGray
+
+// Accents — light-ramp variants read cleanly on the cream day background
+val AccentOrange = Color(0xFFD65D0E)
+val AccentRed    = Color(0xFFCC241D)
+val AccentYellow = Color(0xFFD79921)
+val AccentGreen  = Color(0xFF98971A)
+val AccentAqua   = Color(0xFF689D6A)
+val AccentBlue   = Color(0xFF458588)
+
+val accentPresets      = listOf(AccentOrange, AccentRed, AccentYellow, AccentGreen, AccentAqua, AccentBlue)
+val accentPresetLabels = listOf("Orange", "Red", "Yellow", "Green", "Aqua", "Blue")

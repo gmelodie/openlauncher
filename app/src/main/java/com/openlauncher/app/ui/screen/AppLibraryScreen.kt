@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.openlauncher.app.model.AppInfo
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.LocalDayMode
 
 private enum class AppFilter { USER, SYSTEM, ALL }
@@ -200,8 +202,8 @@ private fun AppTile(
     onClick: () -> Unit
 ) {
     val isDayMode  = LocalDayMode.current
-    val tileBg     = if (isDayMode) Color(0xFFFFFFFF) else Color(0xFF0B0B0B)
-    val tileBorder = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1A1A1A)
+    val tileBg     = if (isDayMode) GruvLightBg1 else Color(0xFF0B0B0B)
+    val tileBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1A1A1A)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
