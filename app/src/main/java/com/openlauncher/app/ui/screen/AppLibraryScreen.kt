@@ -27,6 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.openlauncher.app.model.AppInfo
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg3
 import com.openlauncher.app.ui.theme.GruvLightFg3
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg3
@@ -54,11 +58,11 @@ fun AppLibraryScreen(
     val isDayMode     = LocalDayMode.current
     val screenBg      = MaterialTheme.colorScheme.background
     val headerColor   = MaterialTheme.colorScheme.onBackground
-    val placeholderC  = if (isDayMode) GruvLightFg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-    val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f)
-    val emptyColor    = if (isDayMode) GruvLightFg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
+    val placeholderC  = if (isDayMode) GruvLightFg3 else GruvDarkFg3
+    val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg2
+    val emptyColor    = if (isDayMode) GruvLightFg3 else GruvDarkFg3
     val fieldTextC    = MaterialTheme.colorScheme.onBackground
-    val fieldBorderU  = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
+    val fieldBorderU  = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg3
 
     val anyPickerMode = isPickerMode || isCarPlayPickerMode
     var query     by remember { mutableStateOf("") }
@@ -205,8 +209,8 @@ private fun AppTile(
     onClick: () -> Unit
 ) {
     val isDayMode  = LocalDayMode.current
-    val tileBg     = if (isDayMode) GruvLightBg1 else Color(0xFF0B0B0B)
-    val tileBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1A1A1A)
+    val tileBg     = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val tileBorder = if (isDayMode) GruvLightBg3 else GruvDarkBg3
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -236,7 +240,7 @@ private fun AppTile(
         Text(
             text          = app.appName.uppercase(),
             style         = MaterialTheme.typography.labelSmall,
-            color         = if (isDayMode) Color(0xFF666666) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            color         = if (isDayMode) Color(0xFF666666) else GruvDarkFg3,
             maxLines      = 1,
             overflow      = TextOverflow.Ellipsis,
             textAlign     = TextAlign.Center,

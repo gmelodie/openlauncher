@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
 import com.openlauncher.app.data.ClockStyle
+import com.openlauncher.app.ui.theme.GruvDarkBg2
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -111,7 +112,7 @@ private fun AnalogClock(now: Date, accent: Color, isDayMode: Boolean = false) {
     val ringColor = widgetLine(isDayMode)
     val tickColor = widgetSubInk(isDayMode)
     val minuteHandColor = widgetInk(isDayMode)
-    val pivotBg = if (isDayMode) GruvLightBg2 else Color(0xFF1E1E1E)
+    val pivotBg = if (isDayMode) GruvLightBg2 else GruvDarkBg2
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {

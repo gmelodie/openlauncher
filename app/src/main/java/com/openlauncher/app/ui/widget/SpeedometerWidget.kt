@@ -32,12 +32,14 @@ fun SpeedometerWidget(
     val maxSpeed     = if (isMetric) 200f else 124f
     val speedDisplay = (location?.speedMps ?: 0f).speedIn(isMetric).coerceAtLeast(0f)
     val unitLabel    = if (isMetric) "KM/H" else "MPH"
-    val trackAlpha   = if (isDayMode) 0.18f else 0.07f
-    val tickAlphaMaj = if (isDayMode) 0.50f else 0.28f
-    val tickAlphaMin = if (isDayMode) 0.25f else 0.13f
+    // One set of alphas for both modes: the night ink is cream on charcoal, so
+    // the dimmer night values the gauge used to carry sank into the card.
+    val trackAlpha   = 0.18f
+    val tickAlphaMaj = 0.50f
+    val tickAlphaMin = 0.25f
 
     val contentColor = widgetInk(isDayMode)
-    val subAlpha     = if (isDayMode) 0.55f else 0.32f
+    val subAlpha     = 0.55f
     val tickBaseColor = if (isDayMode) Color(0xFF222222) else MaterialTheme.colorScheme.onBackground
 
     Box(

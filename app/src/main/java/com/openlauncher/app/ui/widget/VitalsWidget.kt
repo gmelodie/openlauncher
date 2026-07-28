@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.openlauncher.app.ui.theme.GruvDarkGray
 import com.openlauncher.app.ui.theme.widgetInk
 import com.openlauncher.app.ui.theme.widgetSubInk
 import com.openlauncher.app.ui.theme.widgetLine
@@ -136,7 +137,7 @@ private fun warningColor(
     accent: Color,
     isDayMode: Boolean
 ): Color = when {
-    value == null    -> if (isDayMode) Color(0xFFAAAAAA) else Color(0xFF555555)
+    value == null    -> if (isDayMode) Color(0xFFAAAAAA) else GruvDarkGray
     value > alert    -> Color(0xFFDD5555)
     value > warn     -> Color(0xFFE6A23C)
     else             -> accent

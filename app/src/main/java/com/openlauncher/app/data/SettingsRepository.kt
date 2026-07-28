@@ -66,8 +66,9 @@ private fun AppSettings.sanitized(): AppSettings {
         .distinctBy { it.id }
         .map { it.clampToGrid() }
     return copy(
+        // shortcuts is left alone: an empty sidebar is a choice the driver can
+        // make, and the add slot brings shortcuts back.
         widgetLayout = layout.ifEmpty { defaultWidgetLayout() },
-        shortcuts = shortcuts.ifEmpty { defaultShortcuts() },
         soundboardPads = soundboardPads.ifEmpty { defaultSoundboardPads() },
         textScale = textScale.coerceIn(0.8f, 1.8f),
         uiScale = uiScale.coerceIn(0.5f, 2.0f),

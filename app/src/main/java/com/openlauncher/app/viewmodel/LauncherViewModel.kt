@@ -33,7 +33,6 @@ import com.openlauncher.app.data.WidgetConfig
 import com.openlauncher.app.data.activeWidgetIds
 import com.openlauncher.app.data.activeWidgets
 import com.openlauncher.app.data.computeWidgetMove
-import com.openlauncher.app.data.defaultShortcuts
 import com.openlauncher.app.data.freeGridArea
 import com.openlauncher.app.util.SunriseSunset
 import com.openlauncher.app.model.AppInfo
@@ -101,12 +100,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _nav.value = NavDestination.HOME
     }
 
+    // Drops the slot. Overwriting it with the default shortcut for that index put
+    // the app the driver just removed straight back on the sidebar.
     fun removeShortcut(slot: Int) {
         updateSettings {
             copy(shortcuts = shortcuts.toMutableList().also { list ->
-                if (slot in list.indices) {
-                    list[slot] = defaultShortcuts().getOrNull(slot) ?: ShortcutConfig()
-                }
+                if (slot in list.indices) list.removeAt(slot)
             })
         }
     }

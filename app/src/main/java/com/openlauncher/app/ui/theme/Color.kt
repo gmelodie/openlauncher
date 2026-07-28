@@ -16,11 +16,17 @@ val GruvLightFg0   = Color(0xFF282828) // strongest ink
 val GruvLightFg1   = Color(0xFF3C3836) // body text
 val GruvLightFg3   = Color(0xFF665C54) // muted text
 
-// Dark ramp (charcoal base, cream ink)
-val GruvDarkBg0    = Color(0xFF282828)
-val GruvDarkBg1    = Color(0xFF3C3836)
-val GruvDarkBg2    = Color(0xFF504945)
-val GruvDarkGray   = Color(0xFF928374)
+// Dark ramp (charcoal base, cream ink). Night surfaces and ink both live here:
+// the night background is #282828, not black, so anything darker than bg2 or
+// dimmer than the gray disappears into it.
+val GruvDarkBg0    = Color(0xFF282828) // base background
+val GruvDarkBg1    = Color(0xFF3C3836) // raised surface
+val GruvDarkBg2    = Color(0xFF504945) // higher surface
+val GruvDarkBg3    = Color(0xFF665C54) // borders / outlines
+val GruvDarkGray   = Color(0xFF928374) // faint ink, disabled controls
+val GruvDarkFg0    = Color(0xFFFBF1C7) // strongest ink
+val GruvDarkFg1    = Color(0xFFEBDBB2) // body text
+val GruvDarkFg3    = Color(0xFFBDAE93) // muted text
 
 // Neutral (dark) surfaces reused by dropdowns and the always-dark colour picker
 val DimSurface  = GruvDarkBg1
@@ -35,6 +41,11 @@ val AccentYellow = Color(0xFFD79921)
 val AccentGreen  = Color(0xFF98971A)
 val AccentAqua   = Color(0xFF689D6A)
 val AccentBlue   = Color(0xFF458588)
+
+// Warnings. The day red is muted for the cream background; the night red is the
+// bright gruvbox red, which is the dimmest red that still reads on charcoal.
+val DangerRedDay   = Color(0xFF993333)
+val DangerRedNight = Color(0xFFFB4934)
 
 val accentPresets      = listOf(AccentOrange, AccentRed, AccentYellow, AccentGreen, AccentAqua, AccentBlue)
 val accentPresetLabels = listOf("Orange", "Red", "Yellow", "Green", "Aqua", "Blue")

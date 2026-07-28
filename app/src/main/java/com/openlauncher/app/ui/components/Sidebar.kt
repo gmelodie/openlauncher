@@ -39,6 +39,13 @@ import com.openlauncher.app.data.AppSettings
 import com.openlauncher.app.data.DefaultShortcutIcon
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.model.NavDestination
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg0
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
+import com.openlauncher.app.ui.theme.GruvDarkGray
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightBg3
@@ -61,14 +68,15 @@ fun Sidebar(
     onShortcutRemove: (Int) -> Unit,
     onShortcutSetIcon: (Int, DefaultShortcutIcon?) -> Unit,
     onReorder: (from: Int, to: Int) -> Unit,
+    onAddShortcut: () -> Unit,
     isHorizontal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isDayMode    = LocalDayMode.current
     val accent       = Color(settings.accentColor)
-    val sidebarBg    = if (isDayMode) GruvLightBg1 else Color.Black.copy(alpha = 0.4f)
-    val iconInactive = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-    val dividerColor = if (isDayMode) GruvLightBg3 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+    val sidebarBg    = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val iconInactive = if (isDayMode) Color(0xFF777777) else GruvDarkFg3
+    val dividerColor = if (isDayMode) GruvLightBg3 else GruvDarkBg3
     val density      = LocalDensity.current
     val slotSizePx   = with(density) { SLOT_SIZE.toPx() }
 
@@ -128,6 +136,9 @@ fun Sidebar(
                 }
             )
         }
+        // The slot list holds only bound shortcuts, so without this the sidebar
+        // has no way to grow.
+        AddShortcutSlot(isHorizontal = isHorizontal, onClick = onAddShortcut)
     }
 
     // Home sits outermost on whichever edge the nav buttons occupy.
@@ -307,7 +318,7 @@ private fun ShortcutSlot(
                 )
             }
     ) {
-        val iconInactive = if (LocalDayMode.current) Color(0xFF777777) else Color(0xFF3A3A3A)
+        val iconInactive = if (LocalDayMode.current) Color(0xFF777777) else GruvDarkFg3
         val override = shortcut.customIconOverride
         when {
             override != null && override != DefaultShortcutIcon.NONE -> {
@@ -341,11 +352,32 @@ private fun ShortcutSlot(
                 Icon(
                     imageVector        = Icons.Default.Add,
                     contentDescription = "Add shortcut",
-                    tint               = if (LocalDayMode.current) Color(0xFFBBBBBB) else Color(0xFF252525),
+                    tint               = if (LocalDayMode.current) GruvLightBg3 else GruvDarkGray,
                     modifier           = Modifier.size(ICON_SIZE)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AddShortcutSlot(isHorizontal: Boolean, onClick: () -> Unit) {
+    val isDayMode = LocalDayMode.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .then(
+                if (isHorizontal) Modifier.fillMaxHeight().width(SLOT_SIZE)
+                else              Modifier.fillMaxWidth().height(SLOT_SIZE)
+            )
+            .clickable(onClick = onClick)
+    ) {
+        Icon(
+            imageVector        = Icons.Default.Add,
+            contentDescription = "Add shortcut",
+            tint               = if (isDayMode) GruvLightFg3 else GruvDarkFg3,
+            modifier           = Modifier.size(ICON_SIZE)
+        )
     }
 }
 
@@ -358,9 +390,9 @@ private fun ShortcutActionDialog(
     onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val surface = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
-    val outline = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
-    val divider = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
+    val surface = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val outline = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val divider = if (isDayMode) GruvLightBg2 else GruvDarkBg2
     val action  = if (isDayMode) GruvLightFg1 else accent
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -405,12 +437,12 @@ private fun IconPickerDialog(
     onDismiss: () -> Unit
 ) {
     val vectorOptions = DefaultShortcutIcon.entries.filter { it != DefaultShortcutIcon.NONE }
-    val surface  = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
-    val outline  = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
-    val divider  = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
-    val labelC   = if (isDayMode) GruvLightFg3 else Color(0xFFA89984)
-    val tileBg   = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
-    val tileTint = if (isDayMode) GruvLightFg1 else Color(0xFFA89984)
+    val surface  = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val outline  = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val divider  = if (isDayMode) GruvLightBg2 else GruvDarkBg2
+    val labelC   = if (isDayMode) GruvLightFg3 else GruvDarkFg3
+    val tileBg   = if (isDayMode) GruvLightBg2 else GruvDarkBg2
+    val tileTint = if (isDayMode) GruvLightFg1 else GruvDarkFg1
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -490,8 +522,8 @@ private fun NavButton(
     onClick: () -> Unit
 ) {
     val isDayMode = LocalDayMode.current
-    val activeIconColor = if (isDayMode) Color(0xFF111111) else Color.White
-    val activeBg = if (isDayMode) Color(0xFF000000).copy(alpha = 0.08f) else Color.White.copy(alpha = 0.06f)
+    val activeIconColor = if (isDayMode) Color(0xFF111111) else GruvDarkFg0
+    val activeBg = if (isDayMode) Color(0xFF000000).copy(alpha = 0.08f) else GruvDarkBg2
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier

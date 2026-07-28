@@ -2,7 +2,12 @@ package com.openlauncher.app.ui.components
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import com.openlauncher.app.ui.theme.DangerRedDay
+import com.openlauncher.app.ui.theme.DangerRedNight
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkFg0
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightFg1
 import com.openlauncher.app.ui.theme.GruvLightFg3
@@ -23,16 +28,16 @@ fun ConfirmDialog(
         text  = { Text(message, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = if (isDayMode) Color(0xFFC0392B) else Color(0xFFFF5252))
+                Text(confirmLabel, color = if (isDayMode) DangerRedDay else DangerRedNight)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = if (isDayMode) GruvLightFg3 else Color(0xFFAAAAAA))
+                Text("Cancel", color = if (isDayMode) GruvLightFg3 else GruvDarkFg3)
             }
         },
-        containerColor    = if (isDayMode) GruvLightBg1 else Color(0xFF1A1A1A),
-        titleContentColor = if (isDayMode) GruvLightFg1 else Color.White,
-        textContentColor  = if (isDayMode) GruvLightFg3 else Color(0xFFCCCCCC)
+        containerColor    = if (isDayMode) GruvLightBg1 else GruvDarkBg1,
+        titleContentColor = if (isDayMode) GruvLightFg1 else GruvDarkFg0,
+        textContentColor  = if (isDayMode) GruvLightFg3 else GruvDarkFg1
     )
 }

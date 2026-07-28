@@ -16,6 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg0
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.GruvLightFg1
@@ -37,13 +42,13 @@ fun ColorPickerDialog(
         FloatArray(3).also { android.graphics.Color.colorToHSV(initialColor.toArgb(), it) }
     }
     val isDayMode = LocalDayMode.current
-    val surface     = if (isDayMode) GruvLightBg1 else Color(0xFF1A1A1A)
-    val titleColor  = if (isDayMode) GruvLightFg1 else Color.White
-    val bodyColor   = if (isDayMode) GruvLightFg3 else Color(0xFFCCCCCC)
-    val labelColor  = if (isDayMode) GruvLightFg3 else Color(0xFF888888)
-    val subLabelColor = if (isDayMode) GruvLightFg3 else Color(0xFF666666)
-    val outline     = if (isDayMode) GruvLightBg3 else Color(0xFF2A2A2A)
-    val swatchEdge  = if (isDayMode) GruvLightFg1 else Color.White
+    val surface     = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val titleColor  = if (isDayMode) GruvLightFg1 else GruvDarkFg0
+    val bodyColor   = if (isDayMode) GruvLightFg3 else GruvDarkFg1
+    val labelColor  = if (isDayMode) GruvLightFg3 else GruvDarkFg3
+    val subLabelColor = if (isDayMode) GruvLightFg3 else GruvDarkFg3
+    val outline     = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val swatchEdge  = if (isDayMode) GruvLightFg1 else GruvDarkFg0
 
     var selectedColor by remember { mutableStateOf(initialColor) }
     var hue   by remember { mutableFloatStateOf(initialHsv[0]) }

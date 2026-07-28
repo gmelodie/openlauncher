@@ -28,7 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.openlauncher.app.data.RadioPresets
+import com.openlauncher.app.ui.theme.GruvDarkBg0
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
+import com.openlauncher.app.ui.theme.GruvLightBg0
 import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightFg0
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import androidx.compose.ui.graphics.asImageBitmap
@@ -269,9 +276,9 @@ private fun RadioDeck(
     val displayFreq = freqClean.ifEmpty { hardwareRadio.freq }
     val displayUnit = if (hardwareRadio.isAm) "kHz" else "MHz"
 
-    val chipInactiveBg = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
-    val chipActiveBg   = if (isDayMode) Color(0xFF222222) else Color(0xFFDDDDDD)
-    val chipActiveText = if (isDayMode) Color.White else Color(0xFF111111)
+    val chipInactiveBg = if (isDayMode) GruvLightBg2 else GruvDarkBg2
+    val chipActiveBg   = if (isDayMode) Color(0xFF222222) else GruvDarkFg1
+    val chipActiveText = if (isDayMode) Color.White else GruvDarkBg0
 
     Column(
         modifier = modifier
@@ -420,19 +427,19 @@ private fun RadioDeck(
                         isTuned && isDayMode -> Color(0xFF222222)
                         isTuned              -> accent
                         isDayMode            -> GruvLightBg3
-                        else                 -> Color(0xFF1D2024)
+                        else                 -> GruvDarkBg3
                     }
                     val presetNumColor = when {
                         isTuned && isDayMode -> Color.White
                         isTuned              -> accent
                         isDayMode            -> Color(0xFF444444)
-                        else                 -> Color(0xFF777777)
+                        else                 -> GruvDarkFg3
                     }
                     val presetFreqColor = when {
                         isTuned && isDayMode -> Color.White.copy(alpha = 0.9f)
                         isTuned              -> accent.copy(alpha = 0.9f)
                         isDayMode            -> Color(0xFF666666)
-                        else                 -> Color(0xFF777777).copy(alpha = 0.7f)
+                        else                 -> GruvDarkFg3
                     }
                     Box(
                         modifier = Modifier
@@ -521,7 +528,7 @@ private fun StandardMinimalPlayer(
     onTapToOpenApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val idleIconColor = if (isDayMode) Color(0xFF555555) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
+    val idleIconColor = if (isDayMode) Color(0xFF555555) else GruvDarkFg3
     val idleTextColor = idleIconColor
 
     Box(modifier = modifier) {
@@ -556,7 +563,7 @@ private fun StandardMinimalPlayer(
                         if (hasCarPlay && hasAutoApp) {
                             androidx.compose.material3.VerticalDivider(
                                 modifier = Modifier.fillMaxHeight().padding(vertical = 16.dp),
-                                color = if (isDayMode) Color(0xFFBBBBBB) else Color(0xFF1E1E1E)
+                                color = if (isDayMode) Color(0xFFBBBBBB) else GruvDarkBg3
                             )
                         }
                         if (hasAutoApp) {
@@ -606,11 +613,11 @@ private fun StandardMinimalPlayer(
 
             val currentTextColor = if (hasAlbumArt) Color.White else widgetInk(isDayMode)
             val currentSubTextColor = if (hasAlbumArt) Color.White.copy(alpha = 0.6f) else widgetSubInk(isDayMode)
-            val currentProgressColor = if (onArtwork) accent else Color(0xFF111111)
+            val currentProgressColor = if (onArtwork) accent else GruvLightFg0
             val currentProgressTrack = currentTextColor.copy(alpha = 0.15f)
             val currentIconColor = currentTextColor.copy(alpha = 0.75f)
-            val currentPlayBgColor = if (onArtwork) accent.copy(alpha = 0.9f) else Color(0xFF111111)
-            val currentPlayIconColor = if (onArtwork) Color.Black else Color.White
+            val currentPlayBgColor = if (onArtwork) accent.copy(alpha = 0.9f) else GruvLightFg0
+            val currentPlayIconColor = if (onArtwork) Color.Black else GruvLightBg0
 
             if (hasAlbumArt) {
                 // Prefer the full-resolution art URI when the source app provides

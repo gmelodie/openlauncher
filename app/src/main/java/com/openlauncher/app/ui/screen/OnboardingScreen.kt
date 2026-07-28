@@ -34,6 +34,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openlauncher.app.BuildConfig
+import com.openlauncher.app.ui.theme.GruvDarkBg0
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg0
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
+import com.openlauncher.app.ui.theme.GruvDarkGray
 import com.openlauncher.app.ui.theme.GruvLightBg0
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
@@ -50,13 +58,13 @@ fun OnboardingScreen(
     isDayMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val pageBg    = if (isDayMode) GruvLightBg0 else Color(0xFF070707)
-    val paneBg    = if (isDayMode) GruvLightBg1 else Color(0xFF0F0F0F)
-    val separator = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
-    val titleText = if (isDayMode) GruvLightFg1 else Color.White
-    val bodyText  = if (isDayMode) GruvLightFg3 else Color(0xFFAAAAAA)
-    val mutedText = if (isDayMode) GruvLightFg3 else Color(0xFF666666)
-    val faintText = if (isDayMode) GruvLightBg3 else Color(0xFF333333)
+    val pageBg    = if (isDayMode) GruvLightBg0 else GruvDarkBg0
+    val paneBg    = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val separator = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val titleText = if (isDayMode) GruvLightFg1 else GruvDarkFg0
+    val bodyText  = if (isDayMode) GruvLightFg3 else GruvDarkFg1
+    val mutedText = if (isDayMode) GruvLightFg3 else GruvDarkFg3
+    val faintText = if (isDayMode) GruvLightBg3 else GruvDarkGray
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -321,7 +329,7 @@ private fun StepItem(stepIndex: Int, title: String, currentStep: Int) {
     val tint = when {
         active -> MaterialTheme.colorScheme.primary
         completed -> Color(0xFF44AA44)
-        else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
+        else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
     }
 
     Row(
@@ -576,9 +584,9 @@ private fun FinalStep(
 @Composable
 private fun statusBackground(isGranted: Boolean, isDayMode: Boolean): Color = when {
     isGranted && isDayMode -> GruvLightBg2
-    isGranted              -> Color(0xFF0F1E10)
+    isGranted              -> GruvDarkBg2
     isDayMode              -> Color(0xFFF2D5D5)
-    else                   -> Color(0xFF1E1010)
+    else                   -> GruvDarkBg1
 }
 
 @Composable

@@ -47,6 +47,14 @@ import com.openlauncher.app.data.GRID_ROWS
 import com.openlauncher.app.data.WidgetConfig
 import com.openlauncher.app.model.NowPlayingState
 import com.openlauncher.app.model.WeatherState
+import com.openlauncher.app.ui.theme.DangerRedDay
+import com.openlauncher.app.ui.theme.DangerRedNight
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
+import com.openlauncher.app.ui.theme.GruvDarkGray
 import com.openlauncher.app.ui.theme.GruvLightBg0
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
@@ -151,16 +159,16 @@ fun HomeScreen(
     val widgetBg     = when {
         isDayMode    -> GruvLightBg1
         hasWallpaper -> Color(0xCC000000)
-        else         -> Color.Black.copy(alpha = 0.35f)
+        else         -> GruvDarkBg1
     }
     val widgetBorder = when {
         isDayMode    -> GruvLightBg3
         hasWallpaper -> Color(0x22FFFFFF)
-        else         -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+        else         -> GruvDarkBg3
     }
     val headerTextColor   = if (isDayMode) GruvLightFg1 else accent
-    val statusIconColor   = if (isDayMode) GruvLightFg1 else Color(0xFF888888)
-    val controlIconColor  = if (isDayMode) GruvLightFg3 else Color(0xFF777777)
+    val statusIconColor   = if (isDayMode) GruvLightFg1 else GruvDarkFg1
+    val controlIconColor  = if (isDayMode) GruvLightFg3 else GruvDarkFg3
 
     var resizingId    by remember { mutableStateOf<String?>(null) }
     var contextMenuId by remember { mutableStateOf<String?>(null) }
@@ -232,7 +240,7 @@ fun HomeScreen(
             }
         }
 
-        HorizontalDivider(color = if (isDayMode) GruvLightBg3 else Color(0xFF141414))
+        HorizontalDivider(color = if (isDayMode) GruvLightBg3 else GruvDarkBg2)
 
         // ── Widget Grid ─────────────────────────────────────────────────────
         BoxWithConstraints(
@@ -299,7 +307,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .absoluteOffset(x = dX, y = dY)
                                     .size(dW, dH)
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), WIDGET_RADIUS)
+                                    .border(1.dp, accent.copy(alpha = 0.25f), WIDGET_RADIUS)
                             )
                         }
                     }
@@ -501,7 +509,7 @@ fun HomeScreen(
                         isGhost -> Color.Transparent
                         w.id == "NOW_PLAYING" && nowPlaying?.albumArt != null && nowPlaying.title.isNotEmpty() -> Color.Transparent
                         isDayMode -> GruvLightFg3
-                        else      -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                        else      -> GruvDarkFg3
                     }
                     Text(
                         text          = label,
@@ -599,9 +607,9 @@ private fun WidgetContextMenu(
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val menuBg    = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
-    val menuBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
-    val menuDivider = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
+    val menuBg    = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val menuBorder = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val menuDivider = if (isDayMode) GruvLightBg2 else GruvDarkBg2
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -686,9 +694,9 @@ private fun ContextRow(
     isDayMode: Boolean = false
 ) {
     val finalTint = when (tone) {
-        ContextTone.DANGER   -> Color(0xFF884444)
+        ContextTone.DANGER   -> if (isDayMode) DangerRedDay else DangerRedNight
         ContextTone.SELECTED -> accent
-        ContextTone.INACTIVE -> if (isDayMode) GruvLightFg3 else Color(0xFF777777)
+        ContextTone.INACTIVE -> if (isDayMode) GruvLightFg3 else GruvDarkFg3
         ContextTone.ACTION   -> if (isDayMode) Color(0xFF111111) else accent
     }
     Row(
@@ -720,7 +728,7 @@ private fun WidgetResizeDialog(
 
     val dialogBg     = if (isDayMode) GruvLightBg1 else MaterialTheme.colorScheme.background
     val dialogText   = if (isDayMode) GruvLightFg1 else MaterialTheme.colorScheme.onBackground
-    val cancelColor  = if (isDayMode) Color(0xFF6C757D) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+    val cancelColor  = if (isDayMode) Color(0xFF6C757D) else GruvDarkFg3
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -764,9 +772,9 @@ private fun SpanRow(
     onChange: (Int) -> Unit
 ) {
     val textColor   = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val dimColor    = if (isDayMode) Color(0xFF495057) else Color(0xFF666666)
-    val disabledC   = if (isDayMode) Color(0xFFCED4DA) else Color(0xFF333333)
-    val inactiveBg  = if (isDayMode) Color(0xFFE9ECEF) else Color(0xFF2A2A2A)
+    val dimColor    = if (isDayMode) Color(0xFF495057) else GruvDarkFg3
+    val disabledC   = if (isDayMode) Color(0xFFCED4DA) else GruvDarkGray
+    val inactiveBg  = if (isDayMode) Color(0xFFE9ECEF) else GruvDarkBg2
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -832,10 +840,10 @@ private fun WidgetLibraryDialog(
     onRemove: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val dialogBg    = if (isDayMode) GruvLightBg1 else Color(0xFF0C0C0C)
-    val dialogBorder = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
-    val titleColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF555555)
-    val closeColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF444444)
+    val dialogBg    = if (isDayMode) GruvLightBg1 else GruvDarkBg1
+    val dialogBorder = if (isDayMode) GruvLightBg3 else GruvDarkBg3
+    val titleColor  = if (isDayMode) Color(0xFF495057) else GruvDarkFg3
+    val closeColor  = if (isDayMode) Color(0xFF495057) else GruvDarkFg3
 
     val activeIds = settings.activeWidgetIds()
     val canAdd = canAddWidget(settings)
@@ -888,7 +896,7 @@ private fun WidgetLibraryDialog(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text          = "ALL ${GRID_COLS * GRID_ROWS} CELLS OCCUPIED — REMOVE A WIDGET TO ADD MORE",
-                    color         = if (isDayMode) Color(0xFFE03131) else Color(0xFF3A3A3A),
+                    color         = if (isDayMode) Color(0xFFE03131) else DangerRedNight,
                     fontSize      = 8.sp,
                     letterSpacing = 1.sp,
                     modifier      = Modifier.fillMaxWidth(),
@@ -909,10 +917,10 @@ private fun WidgetLibraryCard(
     onToggle: () -> Unit
 ) {
     val enabled    = isActive || canAdd
-    val cardBorder = if (isActive) accent else if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1A1A1A)
-    val cardBg     = if (isActive) accent.copy(alpha = 0.15f) else if (isDayMode) GruvLightBg0 else Color(0xFF0E0E0E)
-    val iconTint   = if (isActive) accent else if (isDayMode) Color(0xFF495057) else Color(0xFF333333)
-    val labelColor = if (isActive) accent else if (isDayMode) Color(0xFF212529) else Color(0xFF3A3A3A)
+    val cardBorder = if (isActive) accent else if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg3
+    val cardBg     = if (isActive) accent.copy(alpha = 0.15f) else if (isDayMode) GruvLightBg0 else GruvDarkBg2
+    val iconTint   = if (isActive) accent else if (isDayMode) Color(0xFF495057) else GruvDarkFg1
+    val labelColor = if (isActive) accent else if (isDayMode) Color(0xFF212529) else GruvDarkFg1
 
     Column(
         modifier = Modifier
@@ -946,8 +954,8 @@ private fun WidgetLibraryCard(
             },
             color         = when {
                 isActive -> accent.copy(alpha = 0.75f)
-                !canAdd  -> if (isDayMode) Color(0xFFADB5BD) else Color(0xFF282828)
-                else     -> if (isDayMode) Color(0xFF495057) else Color(0xFF3A3A3A)
+                !canAdd  -> if (isDayMode) Color(0xFFADB5BD) else GruvDarkGray
+                else     -> if (isDayMode) Color(0xFF495057) else GruvDarkFg3
             },
             fontSize      = 6.sp,
             letterSpacing = 1.sp,

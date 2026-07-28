@@ -24,6 +24,8 @@ import com.openlauncher.app.util.LocationData
 import com.openlauncher.app.util.METERS_TO_MILES
 import com.openlauncher.app.util.speedIn
 import kotlinx.coroutines.delay
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.widgetInk
@@ -450,10 +452,10 @@ private fun TeTactileButton(
         !enabled  -> Color.Transparent
         active    -> keyColor
         isDayMode -> GruvLightBg1
-        else      -> Color(0xFF1D2024)
+        else      -> GruvDarkBg2
     }
 
-    val buttonBorder = if (isDayMode) GruvLightBg3 else Color(0xFF2E3238)
+    val buttonBorder = if (isDayMode) GruvLightBg3 else GruvDarkBg3
     val dotColor = when {
         active  -> if (isDayMode) Color.White else Color.Black
         enabled -> keyColor

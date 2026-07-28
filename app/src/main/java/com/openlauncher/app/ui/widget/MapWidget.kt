@@ -4,16 +4,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -34,6 +35,9 @@ import coil.request.ImageRequest
 import com.openlauncher.app.BuildConfig
 import com.openlauncher.app.data.MAX_MAP_ZOOM
 import com.openlauncher.app.data.MIN_MAP_ZOOM
+import com.openlauncher.app.ui.theme.GruvDarkBg0
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkFg0
 import com.openlauncher.app.ui.theme.GruvLightBg0
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightFg0
@@ -103,7 +107,7 @@ fun MapWidget(
     Box(
         modifier = modifier
             .clipToBounds()
-            .background(if (isDayMode) GruvLightBg2 else Color(0xFF101010))
+            .background(if (isDayMode) GruvLightBg2 else GruvDarkBg1)
             .clickable(enabled = !isEditing, onClick = onOpenNav)
     ) {
         TileGrid(
@@ -209,8 +213,8 @@ private fun BoxScope.MapOverlay(
     isEditing: Boolean,
     onZoomChange: (Int) -> Unit
 ) {
-    val ink = if (isDayMode) GruvLightFg0 else GruvLightBg0
-    val scrim = if (isDayMode) GruvLightBg0.copy(alpha = 0.82f) else Color(0xFF101010).copy(alpha = 0.82f)
+    val ink = if (isDayMode) GruvLightFg0 else GruvDarkFg0
+    val scrim = if (isDayMode) GruvLightBg0.copy(alpha = 0.82f) else GruvDarkBg0.copy(alpha = 0.86f)
     val speed = location.speedMps.speedIn(isMetric)
     val unit = if (isMetric) "km/h" else "mph"
 
@@ -267,6 +271,9 @@ private fun BoxScope.MapOverlay(
     )
 }
 
+// A plain Box, not an IconButton: the button's 48.dp minimum touch target wins
+// over a smaller size(), so its scrim painted a block far wider than the icon
+// and covered the map.
 @Composable
 private fun ZoomButton(
     icon: ImageVector,
@@ -276,10 +283,13 @@ private fun ZoomButton(
     isEditing: Boolean,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        enabled = !isEditing,
-        modifier = Modifier.size(30.dp).background(scrim)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(scrim)
+            .clickable(enabled = !isEditing, onClick = onClick)
     ) {
         Icon(icon, description, tint = ink, modifier = Modifier.size(17.dp))
     }

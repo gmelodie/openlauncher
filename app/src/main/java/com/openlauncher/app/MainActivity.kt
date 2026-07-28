@@ -34,6 +34,7 @@ import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.ui.components.Sidebar
 import com.openlauncher.app.ui.screen.*
 import com.openlauncher.app.ui.theme.GruvDarkBg0
+import com.openlauncher.app.ui.theme.GruvDarkBg2
 import com.openlauncher.app.ui.theme.GruvLightBg0
 import com.openlauncher.app.ui.theme.GruvLightFg1
 import com.openlauncher.app.ui.theme.OpenLauncherTheme
@@ -172,7 +173,7 @@ private fun LauncherShell(
 
     val baseDensity = LocalDensity.current
     val isBottomBar = settings.sidebarPosition == SidebarPosition.BOTTOM
-    val dividerColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1A1A1A)
+    val dividerColor = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg2
 
     Box(modifier = Modifier.fillMaxSize().backgroundOf(settings, background)) {
         if (settings.wallpaperUri.isNotEmpty()) {
@@ -209,15 +210,16 @@ private fun LauncherShell(
                         vm.navigate(dest)
                     },
                     onShortcutClick = { slot ->
-                        settings.shortcuts.getOrNull(slot)
-                            ?.packageName
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let { vm.launchApp(it) }
+                        // An unbound slot has nothing to launch, so a tap picks
+                        // the app instead of doing nothing.
+                        val pkg = settings.shortcuts.getOrNull(slot)?.packageName.orEmpty()
+                        if (pkg.isEmpty()) vm.startShortcutPicker(slot) else vm.launchApp(pkg)
                     },
                     onShortcutLongPress = { slot -> vm.startShortcutPicker(slot) },
                     onShortcutRemove = { slot -> vm.removeShortcut(slot) },
                     onShortcutSetIcon = { slot, icon -> vm.setShortcutIcon(slot, icon) },
-                    onReorder = { from, to -> vm.reorderShortcut(from, to) }
+                    onReorder = { from, to -> vm.reorderShortcut(from, to) },
+                    onAddShortcut = { vm.startShortcutPicker(settings.shortcuts.size) }
                 )
             }
         }

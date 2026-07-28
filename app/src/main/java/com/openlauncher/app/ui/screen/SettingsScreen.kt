@@ -35,6 +35,15 @@ import com.openlauncher.app.data.UnitSystem
 import com.openlauncher.app.BuildConfig
 import com.openlauncher.app.util.homeRoleIntent
 import com.openlauncher.app.util.openHomeSettings
+import com.openlauncher.app.ui.theme.DangerRedDay
+import com.openlauncher.app.ui.theme.DangerRedNight
+import com.openlauncher.app.ui.theme.GruvDarkBg1
+import com.openlauncher.app.ui.theme.GruvDarkBg2
+import com.openlauncher.app.ui.theme.GruvDarkBg3
+import com.openlauncher.app.ui.theme.GruvDarkFg0
+import com.openlauncher.app.ui.theme.GruvDarkFg1
+import com.openlauncher.app.ui.theme.GruvDarkFg3
+import com.openlauncher.app.ui.theme.GruvDarkGray
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.ui.components.ColorPickerDialog
@@ -75,6 +84,7 @@ fun SettingsScreen(
 
     val isDayMode = LocalDayMode.current
     val screenBg  = MaterialTheme.colorScheme.background
+    val danger    = if (isDayMode) DangerRedDay else DangerRedNight
 
     Box(
         modifier = modifier
@@ -145,7 +155,7 @@ fun SettingsScreen(
                 sublabel = if (isDefaultLauncher) "Active — Open Launcher is the home app"
                            else "Required so the head unit boots into Open Launcher",
                 icon     = Icons.Default.Home,
-                accent   = if (isDefaultLauncher) accent else Color(0xFF993333),
+                accent   = if (isDefaultLauncher) accent else danger,
                 onClick  = {
                     val roleIntent = homeRoleIntent(context)
                     if (roleIntent != null) homeRoleLauncher.launch(roleIntent)
@@ -157,7 +167,7 @@ fun SettingsScreen(
                 label    = "Notification Access",
                 sublabel = if (isMediaConnected) "Granted — media controls active" else "Required for Now Playing widget",
                 icon     = if (isMediaConnected) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
-                accent   = if (isMediaConnected) accent else Color(0xFF993333),
+                accent   = if (isMediaConnected) accent else danger,
                 onClick  = {
                     context.startActivity(
                         Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
@@ -170,7 +180,7 @@ fun SettingsScreen(
                 label    = "Draw Over Other Apps",
                 sublabel = if (canDrawOverlays) "Granted — PIP overlay enabled" else "Required for PIP floating window",
                 icon     = if (canDrawOverlays) Icons.Default.Layers else Icons.Default.LayersClear,
-                accent   = if (canDrawOverlays) accent else Color(0xFF993333),
+                accent   = if (canDrawOverlays) accent else danger,
                 onClick  = {
                     if (android.os.Build.VERSION.SDK_INT >= 23) {
                         runCatching {
@@ -189,7 +199,7 @@ fun SettingsScreen(
                 label    = "Location Access",
                 sublabel = if (hasLocation) "Granted — GPS, compass & weather active" else "Required for compass, speed & weather",
                 icon     = if (hasLocation) Icons.Default.LocationOn else Icons.Default.LocationOff,
-                accent   = if (hasLocation) accent else Color(0xFF993333),
+                accent   = if (hasLocation) accent else danger,
                 onClick  = {
                     if (!hasLocation) {
                         // Ask in-app first — previously the only grant path was the
@@ -224,9 +234,9 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value         = nameInput,
                         onValueChange = { nameInput = it },
-                        placeholder   = { Text("MY CAR", color = if (isDayMode) Color(0xFF999999) else Color(0xFF444444), fontSize = 12.sp) },
+                        placeholder   = { Text("MY CAR", color = if (isDayMode) Color(0xFF999999) else GruvDarkGray, fontSize = 12.sp) },
                         singleLine    = true,
-                        textStyle     = LocalTextStyle.current.copy(fontSize = 12.sp, color = if (isDayMode) Color(0xFF111111) else Color.White),
+                        textStyle     = LocalTextStyle.current.copy(fontSize = 12.sp, color = if (isDayMode) Color(0xFF111111) else GruvDarkFg0),
                         colors        = outlinedFieldColors(accent),
                         modifier      = Modifier.width(140.dp)
                     )
@@ -338,7 +348,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Icon(Icons.Default.Close, null, tint = Color(0xFF993333), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Close, null, tint = danger, modifier = Modifier.size(14.dp))
                         }
                     }
                 }
@@ -439,7 +449,7 @@ fun SettingsScreen(
                     if (settings.useGradient) {
                         androidx.compose.material3.Icon(
                             Icons.Default.ArrowForward, null,
-                            tint = if (isDayMode) Color(0xFF999999) else Color(0xFF555555), modifier = Modifier.size(14.dp)
+                            tint = if (isDayMode) Color(0xFF999999) else GruvDarkFg3, modifier = Modifier.size(14.dp)
                         )
                         // End color swatch
                         Box(
@@ -564,7 +574,7 @@ fun SettingsScreen(
                         onClick  = { onUpdate { copy(wallpaperUri = "") } },
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("REMOVE WALLPAPER", color = Color(0xFF993333), fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("REMOVE WALLPAPER", color = danger, fontSize = 9.sp, letterSpacing = 1.sp)
                     }
                 }
             }
@@ -699,7 +709,7 @@ fun SettingsScreen(
                 onClick  = { showResetDialog = true },
                 shape    = RoundedCornerShape(4.dp),
                 colors   = ButtonDefaults.buttonColors(
-                    containerColor = if (isDayMode) GruvLightBg1 else Color(0xFF1A0000)
+                    containerColor = if (isDayMode) GruvLightBg1 else GruvDarkBg1
                 ),
                 modifier = Modifier.fillMaxWidth().height(44.dp)
             ) {
@@ -714,7 +724,7 @@ fun SettingsScreen(
 
         Text(
             text          = "v${BuildConfig.VERSION_NAME}  ·  Made by David Lam  ·  2026",
-            color         = if (isDayMode) Color(0xFFAAAAAA) else Color(0xFF2A2A2A),
+            color         = if (isDayMode) Color(0xFFAAAAAA) else GruvDarkGray,
             fontSize      = 10.sp,
             letterSpacing = 1.sp,
             modifier      = Modifier
@@ -794,8 +804,8 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val isDayMode     = LocalDayMode.current
-    val sectionColor  = if (isDayMode) Color(0xFF888888) else Color(0xFF3A3A3A)
-    val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1E1E1E)
+    val sectionColor  = if (isDayMode) Color(0xFF888888) else GruvDarkFg3
+    val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg2
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text(
             text          = title.uppercase(),
@@ -818,9 +828,9 @@ private fun SettingsRow(
     content: @Composable RowScope.() -> Unit
 ) {
     val isDayMode   = LocalDayMode.current
-    val labelColor  = if (isDayMode) Color(0xFF111111) else Color(0xFFDDDDDD)
-    val subColor    = if (isDayMode) Color(0xFF888888) else Color(0xFF444444)
-    val iconTint    = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+    val labelColor  = if (isDayMode) Color(0xFF111111) else GruvDarkFg1
+    val subColor    = if (isDayMode) Color(0xFF888888) else GruvDarkFg3
+    val iconTint    = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -847,10 +857,10 @@ private fun ColumnScope.SettingsButton(
     onClick: () -> Unit
 ) {
     val isDayMode  = LocalDayMode.current
-    val labelColor = if (isDayMode) Color(0xFF111111) else Color(0xFFDDDDDD)
-    val subColor   = if (isDayMode) Color(0xFF888888) else Color(0xFF444444)
-    val chevronC   = if (isDayMode) Color(0xFFBBBBBB) else Color(0xFF2A2A2A)
-    val iconTint   = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+    val labelColor = if (isDayMode) Color(0xFF111111) else GruvDarkFg1
+    val subColor   = if (isDayMode) Color(0xFF888888) else GruvDarkFg3
+    val chevronC   = if (isDayMode) Color(0xFFBBBBBB) else GruvDarkGray
+    val iconTint   = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -872,14 +882,14 @@ private fun ColumnScope.SettingsButton(
 @Composable
 private fun ColumnScope.SettingsDivider() {
     val isDayMode = LocalDayMode.current
-    HorizontalDivider(color = if (isDayMode) Color(0xFFDDDDDD) else Color(0xFF141414))
+    HorizontalDivider(color = if (isDayMode) Color(0xFFDDDDDD) else GruvDarkBg2)
 }
 
 @Composable
 private fun outlinedFieldColors(accent: Color): androidx.compose.material3.TextFieldColors {
     val isDayMode = LocalDayMode.current
-    val textColor = if (isDayMode) Color(0xFF111111) else Color.White
-    val borderU   = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF2A2A2A)
+    val textColor = if (isDayMode) Color(0xFF111111) else GruvDarkFg0
+    val borderU   = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg3
     return OutlinedTextFieldDefaults.colors(
         focusedBorderColor   = accent,
         unfocusedBorderColor = borderU,
@@ -887,7 +897,7 @@ private fun outlinedFieldColors(accent: Color): androidx.compose.material3.TextF
         unfocusedTextColor   = textColor,
         cursorColor          = accent,
         focusedLabelColor    = accent,
-        unfocusedLabelColor  = if (isDayMode) Color(0xFF888888) else Color(0xFF666666)
+        unfocusedLabelColor  = if (isDayMode) Color(0xFF888888) else GruvDarkFg3
     )
 }
 
@@ -897,9 +907,9 @@ private fun switchColors(accent: Color): androidx.compose.material3.SwitchColors
     return SwitchDefaults.colors(
         checkedThumbColor    = if (isDayMode) Color.White else Color.Black,
         checkedTrackColor    = accent,
-        uncheckedThumbColor  = if (isDayMode) Color(0xFFBBBBBB) else Color(0xFF888888),
-        uncheckedTrackColor  = if (isDayMode) Color(0xFFDDDDDD) else Color(0xFF1E1E1E),
-        uncheckedBorderColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF3A3A3A)
+        uncheckedThumbColor  = if (isDayMode) Color(0xFFBBBBBB) else GruvDarkFg3,
+        uncheckedTrackColor  = if (isDayMode) Color(0xFFDDDDDD) else GruvDarkBg1,
+        uncheckedBorderColor = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg3
     )
 }
 
@@ -909,7 +919,7 @@ private fun sliderColors(accent: Color): androidx.compose.material3.SliderColors
     return SliderDefaults.colors(
         thumbColor         = accent,
         activeTrackColor   = accent,
-        inactiveTrackColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF2A2A2A)
+        inactiveTrackColor = if (isDayMode) Color(0xFFCCCCCC) else GruvDarkBg2
     )
 }
 
