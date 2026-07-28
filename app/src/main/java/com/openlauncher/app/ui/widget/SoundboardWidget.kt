@@ -1,7 +1,12 @@
 package com.openlauncher.app.ui.widget
 
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -54,7 +59,7 @@ fun SoundboardWidget(
 
     val safePads = remember(pads) {
         if (pads.size >= 6) pads.take(6)
-        else pads + List(6 - pads.size) { SoundPadConfig("+", synthType = "") }
+        else pads + List(6 - pads.size) { SoundPadConfig() }
     }
 
     // Outer grid Column with top padding = 22.dp to leave room for card header label "SOUNDBOARD"
@@ -75,7 +80,6 @@ fun SoundboardWidget(
                     val idx = row * 3 + col
                     val pad = safePads[idx]
                     val isActive = activePadIndex == idx
-                    val hasCustomAudio = pad.audioUri.isNotEmpty()
 
                     Box(
                         modifier = Modifier
@@ -91,27 +95,27 @@ fun SoundboardWidget(
                             .then(
                                 if (!isEditing) Modifier.combinedClickable(
                                     onClick = {
-                                        if (pad.label == "+" || (pad.audioUri.isEmpty() && pad.synthType.isEmpty())) {
+                                        if (!pad.isAssigned) {
                                             assigningIndex = idx
-                                        } else {
-                                            activePadIndex = idx
-                                            playSoundPad(
-                                                context = context,
-                                                pad = pad,
-                                                onDone = { activePadIndex = null }
-                                            )
+                                            return@combinedClickable
                                         }
+                                        activePadIndex = idx
+                                        playSoundPad(
+                                            context = context,
+                                            pad = pad,
+                                            onDone = { activePadIndex = null }
+                                        )
                                     },
                                     onLongClick = { assigningIndex = idx }
                                 ) else Modifier
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        val isPlus = pad.label == "+"
+                        val isEmpty = !pad.isAssigned
                         Text(
-                            text = pad.label,
-                            color = if (isActive) accent else if (isPlus) dimColor else contentColor,
-                            fontSize = if (isPlus) 16.sp else 9.sp,
+                            text = if (isEmpty) "+" else pad.label,
+                            color = if (isActive) accent else if (isEmpty) dimColor else contentColor,
+                            fontSize = if (isEmpty) 16.sp else 9.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp,
@@ -154,8 +158,8 @@ private fun PadAssignDialog(
     val dimColor   = if (isDayMode) Color(0xFF888888) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
     val fieldBorder = if (isDayMode) Color(0xFFCCCCCC) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
 
-    var labelText   by remember { mutableStateOf(pad.label) }
-    var synthType   by remember { mutableStateOf(pad.synthType) }
+    var labelText   by remember { mutableStateOf(if (pad.isAssigned) pad.label else "") }
+    var soundName   by remember { mutableStateOf(pad.soundName) }
     var audioUri    by remember { mutableStateOf(pad.audioUri) }
 
     val filePicker = rememberLauncherForActivityResult(
@@ -226,7 +230,7 @@ private fun PadAssignDialog(
                         "loud_fart" to "loud_fart"
                     )
                     preloadedSounds.forEach { (type, chipLabel) ->
-                        val active = synthType == type && audioUri.isEmpty()
+                        val active = soundName == type && audioUri.isEmpty()
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -234,8 +238,8 @@ private fun PadAssignDialog(
                                 .border(1.dp, if (active) accent else fieldBorder, RoundedCornerShape(3.dp))
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(if (active) accent.copy(alpha = 0.12f) else Color.Transparent)
-                                .clickable { 
-                                    synthType = type
+                                .clickable {
+                                    soundName = type
                                     audioUri = ""
                                     labelText = type
                                 },
@@ -299,15 +303,9 @@ private fun PadAssignDialog(
                 }
             }
 
-            if (pad.label != "+" || pad.audioUri.isNotEmpty() || pad.synthType.isNotEmpty()) {
+            if (pad.isAssigned) {
                 OutlinedButton(
-                    onClick = {
-                        onSave(SoundPadConfig(
-                            label     = "+",
-                            audioUri  = "",
-                            synthType = ""
-                        ))
-                    },
+                    onClick = { onSave(SoundPadConfig()) },
                     modifier = Modifier.fillMaxWidth().height(32.dp),
                     shape = RoundedCornerShape(2.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF884444)),
@@ -336,9 +334,9 @@ private fun PadAssignDialog(
                 Button(
                     onClick = {
                         onSave(SoundPadConfig(
-                            label     = labelText.trim().ifEmpty { pad.label },
+                            label     = labelText.trim().ifEmpty { soundName.ifEmpty { "PAD" } },
                             audioUri  = audioUri,
-                            synthType = synthType
+                            soundName = soundName
                         ))
                     },
                     modifier = Modifier.weight(1f).height(32.dp),
@@ -353,69 +351,109 @@ private fun PadAssignDialog(
     }
 }
 
-private fun playSoundPad(context: android.content.Context, pad: SoundPadConfig, onDone: () -> Unit) {
-    val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    mainHandler.post {
-        try {
-            if (pad.audioUri.isNotEmpty()) {
-                val player = MediaPlayer()
-                try {
-                    player.setDataSource(context, android.net.Uri.parse(pad.audioUri))
-                    player.setOnCompletionListener { mp ->
-                        mp.release()
-                        onDone()
-                    }
-                    // Async playback errors (revoked SAF grant, deleted file) must
-                    // also release the player and un-highlight the pad
-                    player.setOnErrorListener { mp, _, _ ->
-                        mp.release()
-                        onDone()
-                        true
-                    }
-                    // prepareAsync: a blocking prepare() on the main thread is an
-                    // ANR risk for content URIs on slow head-unit storage
-                    player.setOnPreparedListener { it.start() }
-                    player.prepareAsync()
-                } catch (e: Exception) {
-                    // Release on synchronous failure — this leaked a native player per failed tap
-                    runCatching { player.release() }
-                    throw e
-                }
-            } else {
-                var resName = pad.synthType.lowercase().trim()
-                var resId = context.resources.getIdentifier(resName, "raw", context.packageName)
-                if (resId == 0) {
-                    // Fallback mapping for legacy synth types saved in user settings
-                    resName = when (resName) {
-                        "horn", "beep", "alert" -> "mario_jump"
-                        "kick", "snare", "bass" -> "mario_coin"
-                        else -> "mario_jump"
-                    }
-                    resId = context.resources.getIdentifier(resName, "raw", context.packageName)
-                }
-                if (resId != 0) {
-                    val player = MediaPlayer.create(context, resId)
-                    if (player != null) {
-                        player.setOnCompletionListener { mp ->
-                            mp.release()
-                            onDone()
-                        }
-                        player.setOnErrorListener { mp, _, _ ->
-                            mp.release()
-                            onDone()
-                            true
-                        }
-                        player.start()
-                    } else {
-                        onDone()
-                    }
-                } else {
-                    onDone()
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("Soundboard", "Error playing pad", e)
+// A pad plays over navigation prompts and music, so it takes transient focus and
+// lets the other app duck for the length of the effect.
+private class AudioFocusHold(context: Context) {
+
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val legacyListener = AudioManager.OnAudioFocusChangeListener { }
+    private var request: AudioFocusRequest? = null
+
+    fun acquire() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                legacyListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+            )
+            return
+        }
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(attributes)
+            .setOnAudioFocusChangeListener(legacyListener)
+            .build()
+        request = focus
+        audioManager.requestAudioFocus(focus)
+    }
+
+    fun release() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(legacyListener)
+            return
+        }
+        request?.let { audioManager.abandonAudioFocusRequest(it) }
+        request = null
+    }
+}
+
+private fun playSoundPad(context: Context, pad: SoundPadConfig, onDone: () -> Unit) {
+    android.os.Handler(android.os.Looper.getMainLooper()).post {
+        val focus = AudioFocusHold(context)
+        val finish = {
+            focus.release()
             onDone()
         }
+        val player = runCatching { buildPlayer(context, pad, finish) }.getOrNull()
+        if (player == null) {
+            finish()
+            return@post
+        }
+        focus.acquire()
+        // prepareAsync keeps a slow content URI off the main thread. A blocking
+        // prepare on head-unit storage is an ANR risk.
+        runCatching { player.prepareAsync() }.onFailure {
+            runCatching { player.release() }
+            finish()
+        }
     }
+}
+
+private fun buildPlayer(context: Context, pad: SoundPadConfig, finish: () -> Unit): MediaPlayer? {
+    val player = MediaPlayer()
+    val attached = runCatching {
+        if (pad.audioUri.isNotEmpty()) {
+            player.setDataSource(context, android.net.Uri.parse(pad.audioUri))
+        } else {
+            val resId = resolveRawSound(context, pad.soundName) ?: return@runCatching false
+            context.resources.openRawResourceFd(resId).use { fd ->
+                player.setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
+            }
+        }
+        true
+    }.getOrDefault(false)
+
+    if (!attached) {
+        runCatching { player.release() }
+        return null
+    }
+    player.setOnPreparedListener { it.start() }
+    player.setOnCompletionListener { mp ->
+        mp.release()
+        finish()
+    }
+    // A revoked SAF grant or a deleted file must also release the player and
+    // clear the highlight on the pad.
+    player.setOnErrorListener { mp, _, _ ->
+        mp.release()
+        finish()
+        true
+    }
+    return player
+}
+
+private fun resolveRawSound(context: Context, soundName: String): Int? {
+    val direct = context.resources.getIdentifier(soundName.lowercase().trim(), "raw", context.packageName)
+    if (direct != 0) return direct
+    // Names stored by versions that generated tones instead of playing files.
+    val legacy = when (soundName.lowercase().trim()) {
+        "kick", "snare", "bass" -> "mario_coin"
+        else -> "mario_jump"
+    }
+    return context.resources.getIdentifier(legacy, "raw", context.packageName).takeIf { it != 0 }
 }

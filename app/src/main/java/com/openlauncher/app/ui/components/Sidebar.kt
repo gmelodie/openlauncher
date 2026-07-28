@@ -40,7 +40,10 @@ import com.openlauncher.app.data.DefaultShortcutIcon
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightBg3
+import com.openlauncher.app.ui.theme.GruvLightFg1
+import com.openlauncher.app.ui.theme.GruvLightFg3
 import com.openlauncher.app.ui.theme.LocalDayMode
 import kotlin.math.roundToInt
 
@@ -127,74 +130,47 @@ fun Sidebar(
         }
     }
 
-    val navButtons: @Composable () -> Unit = {
-        NavButton(
-            icon         = Icons.Default.Apps,
-            label        = "Apps",
-            isActive     = currentDest == NavDestination.APP_LIBRARY,
-            accent       = accent,
-            iconInactive = iconInactive,
-            isHorizontal = isHorizontal,
-            onClick      = { onNavigate(NavDestination.APP_LIBRARY) }
-        )
-        NavButton(
-            icon         = Icons.Default.Settings,
-            label        = "Settings",
-            isActive     = currentDest == NavDestination.SETTINGS,
-            accent       = accent,
-            iconInactive = iconInactive,
-            isHorizontal = isHorizontal,
-            onClick      = { onNavigate(NavDestination.SETTINGS) }
-        )
-        NavButton(
-            icon         = Icons.Default.Home,
-            label        = "Home",
-            isActive     = currentDest == NavDestination.HOME,
-            accent       = accent,
-            iconInactive = iconInactive,
-            isHorizontal = isHorizontal,
-            onClick      = { onNavigate(NavDestination.HOME) }
-        )
+    // Home sits outermost on whichever edge the nav buttons occupy.
+    val navOrder = listOf(NavDestination.HOME, NavDestination.SETTINGS, NavDestination.APP_LIBRARY)
+
+    val navButtons: @Composable (List<NavDestination>) -> Unit = { order ->
+        order.forEach { dest ->
+            NavButton(
+                icon         = dest.icon(),
+                label        = dest.label(),
+                isActive     = currentDest == dest,
+                accent       = accent,
+                iconInactive = iconInactive,
+                isHorizontal = isHorizontal,
+                onClick      = { onNavigate(dest) }
+            )
+        }
     }
 
     if (isHorizontal) {
-        Box(
+        // The shortcut row takes the space the nav buttons leave, instead of an
+        // assumed inset that collapsed the row on a narrow screen.
+        Row(
             modifier = modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(sidebarBg)
+                .background(sidebarBg),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Shortcuts centred, inset past the edge-pinned nav buttons and
-            // scrollable — an unbounded row ran beneath the nav buttons and off
-            // both screen edges once enough slots were added
+            // "Shortcuts on the right" puts the nav buttons on the left, which is
+            // what the setting says. The old layout moved them the other way.
+            if (settings.bottomBarShortcutsRight) navButtons(navOrder)
             Row(
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .weight(1f)
                     .fillMaxHeight()
-                    .padding(horizontal = 150.dp)
                     .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 shortcutsContent()
             }
-
-            // Nav buttons pinned to one edge, Home always outermost
-            Row(
-                modifier = Modifier
-                    .align(if (settings.bottomBarShortcutsRight) Alignment.CenterEnd else Alignment.CenterStart)
-                    .fillMaxHeight(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!settings.bottomBarShortcutsRight) {
-                    NavButton(Icons.Default.Home,     "Home",     currentDest == NavDestination.HOME,        accent, iconInactive, true) { onNavigate(NavDestination.HOME) }
-                    NavButton(Icons.Default.Settings, "Settings", currentDest == NavDestination.SETTINGS,    accent, iconInactive, true) { onNavigate(NavDestination.SETTINGS) }
-                    NavButton(Icons.Default.Apps,     "Apps",     currentDest == NavDestination.APP_LIBRARY, accent, iconInactive, true) { onNavigate(NavDestination.APP_LIBRARY) }
-                } else {
-                    NavButton(Icons.Default.Apps,     "Apps",     currentDest == NavDestination.APP_LIBRARY, accent, iconInactive, true) { onNavigate(NavDestination.APP_LIBRARY) }
-                    NavButton(Icons.Default.Settings, "Settings", currentDest == NavDestination.SETTINGS,    accent, iconInactive, true) { onNavigate(NavDestination.SETTINGS) }
-                    NavButton(Icons.Default.Home,     "Home",     currentDest == NavDestination.HOME,        accent, iconInactive, true) { onNavigate(NavDestination.HOME) }
-                }
-            }
+            if (!settings.bottomBarShortcutsRight) navButtons(navOrder.reversed())
         }
     } else {
         Column(
@@ -216,7 +192,7 @@ fun Sidebar(
             }
 
             HorizontalDivider(color = dividerColor)
-            navButtons()
+            navButtons(navOrder.reversed())
             Spacer(Modifier.height(4.dp))
         }
     }
@@ -225,6 +201,7 @@ fun Sidebar(
     actionSheetSlot?.let { slot ->
         ShortcutActionDialog(
             accent      = accent,
+            isDayMode   = isDayMode,
             onChangeApp = {
                 actionSheetSlot = null
                 onShortcutLongPress(slot)
@@ -245,6 +222,7 @@ fun Sidebar(
     iconPickerSlot?.let { slot ->
         IconPickerDialog(
             accent          = accent,
+            isDayMode       = isDayMode,
             hasNativeIcon   = settings.shortcuts.getOrNull(slot)?.packageName?.isNotEmpty() == true,
             currentOverride = settings.shortcuts.getOrNull(slot)?.customIconOverride,
             onPick  = { icon ->
@@ -374,25 +352,30 @@ private fun ShortcutSlot(
 @Composable
 private fun ShortcutActionDialog(
     accent: Color,
+    isDayMode: Boolean,
     onChangeApp: () -> Unit,
     onCustomizeIcon: () -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val surface = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
+    val outline = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
+    val divider = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
+    val action  = if (isDayMode) GruvLightFg1 else accent
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF111111))
-                .border(1.dp, Color(0xFF1E1E1E), RoundedCornerShape(4.dp))
+                .background(surface)
+                .border(1.dp, outline, RoundedCornerShape(4.dp))
                 .padding(vertical = 4.dp)
                 .width(180.dp)
         ) {
-            ActionRow("CHANGE APP",     Icons.Default.SwapHoriz, accent, onChangeApp)
-            HorizontalDivider(color = Color(0xFF1A1A1A))
-            ActionRow("CUSTOMIZE ICON", Icons.Default.Palette,   accent, onCustomizeIcon)
-            HorizontalDivider(color = Color(0xFF1A1A1A))
-            ActionRow("REMOVE",         Icons.Default.Delete,     Color(0xFF993333), onRemove)
+            ActionRow("CHANGE APP",     Icons.Default.SwapHoriz, action, onChangeApp)
+            HorizontalDivider(color = divider)
+            ActionRow("CUSTOMIZE ICON", Icons.Default.Palette,   action, onCustomizeIcon)
+            HorizontalDivider(color = divider)
+            ActionRow("REMOVE",         Icons.Default.Delete,    Color(0xFF993333), onRemove)
         }
     }
 }
@@ -415,24 +398,31 @@ private fun ActionRow(label: String, icon: ImageVector, tint: Color, onClick: ()
 @Composable
 private fun IconPickerDialog(
     accent: Color,
+    isDayMode: Boolean,
     hasNativeIcon: Boolean,
     currentOverride: DefaultShortcutIcon?,
     onPick: (DefaultShortcutIcon?) -> Unit,
     onDismiss: () -> Unit
 ) {
     val vectorOptions = DefaultShortcutIcon.entries.filter { it != DefaultShortcutIcon.NONE }
+    val surface  = if (isDayMode) GruvLightBg1 else Color(0xFF111111)
+    val outline  = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
+    val divider  = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
+    val labelC   = if (isDayMode) GruvLightFg3 else Color(0xFF888888)
+    val tileBg   = if (isDayMode) GruvLightBg2 else Color(0xFF1A1A1A)
+    val tileTint = if (isDayMode) GruvLightFg1 else Color(0xFF888888)
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF111111))
-                .border(1.dp, Color(0xFF1E1E1E), RoundedCornerShape(4.dp))
+                .background(surface)
+                .border(1.dp, outline, RoundedCornerShape(4.dp))
                 .padding(12.dp)
         ) {
             Text(
                 "CHOOSE ICON",
-                color         = Color(0xFF888888),
+                color         = labelC,
                 fontSize      = 9.sp,
                 letterSpacing = 2.sp,
                 modifier      = Modifier.padding(bottom = 10.dp)
@@ -449,15 +439,15 @@ private fun IconPickerDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Apps, null, tint = if (currentOverride == null) accent else Color(0xFF666666), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Apps, null, tint = if (currentOverride == null) accent else tileTint, modifier = Modifier.size(18.dp))
                     Text(
                         "NATIVE APP ICON",
-                        color         = if (currentOverride == null) accent else Color(0xFF888888),
+                        color         = if (currentOverride == null) accent else labelC,
                         fontSize      = 9.sp,
                         letterSpacing = 1.sp
                     )
                 }
-                HorizontalDivider(color = Color(0xFF1A1A1A), modifier = Modifier.padding(vertical = 6.dp))
+                HorizontalDivider(color = divider, modifier = Modifier.padding(vertical = 6.dp))
             }
 
             LazyVerticalGrid(
@@ -473,13 +463,13 @@ private fun IconPickerDialog(
                         modifier = Modifier
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(if (isSelected) accent.copy(alpha = 0.18f) else Color(0xFF1A1A1A))
+                            .background(if (isSelected) accent.copy(alpha = 0.18f) else tileBg)
                             .clickable { onPick(iconOption) }
                     ) {
                         Icon(
                             imageVector        = iconOption.toIcon(),
                             contentDescription = iconOption.name,
-                            tint               = if (isSelected) accent else Color(0xFF888888),
+                            tint               = if (isSelected) accent else tileTint,
                             modifier           = Modifier.size(20.dp)
                         )
                     }
@@ -519,6 +509,18 @@ private fun NavButton(
             modifier           = Modifier.size(ICON_SIZE)
         )
     }
+}
+
+private fun NavDestination.icon(): ImageVector = when (this) {
+    NavDestination.HOME        -> Icons.Default.Home
+    NavDestination.SETTINGS    -> Icons.Default.Settings
+    NavDestination.APP_LIBRARY -> Icons.Default.Apps
+}
+
+private fun NavDestination.label(): String = when (this) {
+    NavDestination.HOME        -> "Home"
+    NavDestination.SETTINGS    -> "Settings"
+    NavDestination.APP_LIBRARY -> "Apps"
 }
 
 fun DefaultShortcutIcon.toIcon(): ImageVector = when (this) {

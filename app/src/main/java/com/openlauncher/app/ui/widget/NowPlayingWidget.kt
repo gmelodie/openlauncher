@@ -1,14 +1,11 @@
 package com.openlauncher.app.ui.widget
 
 import android.media.MediaMetadata
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,14 +26,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import com.openlauncher.app.data.RadioPresets
 import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,12 +42,16 @@ import com.openlauncher.app.service.MediaListenerService
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
+private enum class MediaSource { PLAYER, RADIO }
+
 @Composable
 fun NowPlayingWidget(
     state: NowPlayingState?,
     accent: Color,
     carPlayPackage: String,
     androidAutoPackage: String,
+    radioPresets: RadioPresets,
+    onSetRadioPreset: (index: Int, isFm: Boolean, freq: Float) -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
@@ -72,21 +71,18 @@ fun NowPlayingWidget(
     onRadioTune: (band: String, freq: Float) -> Unit = { _, _ -> },
     onAssignRadio: () -> Unit = {}
 ) {
-    val context     = LocalContext.current
     val isConnected by MediaListenerService.isConnected.collectAsState()
     val hasCarPlay  = carPlayPackage.isNotEmpty()
     val hasAutoApp  = androidAutoPackage.isNotEmpty()
     val hasContent  = state != null && state.title.isNotEmpty()
 
-    var selectedSource by rememberSaveable { mutableStateOf("Any Player") }
+    var selectedSource by rememberSaveable { mutableStateOf(MediaSource.PLAYER) }
 
-    // Auto-switch to radio view when hardware radio is detected.
-    // Keyed on presence (not the state object) so freq/RDS updates don't
-    // keep forcing the radio view after the user picks "Any Player".
+    // Keyed on presence, not on the state object, so frequency and RDS updates
+    // do not force the radio view back after the driver picks the player.
     val hasHardwareRadio = hardwareRadio != null
     LaunchedEffect(hasHardwareRadio) {
-        if (hasHardwareRadio) selectedSource = "FM/AM Radio"
-        else if (selectedSource == "FM/AM Radio") selectedSource = "Any Player"
+        selectedSource = if (hasHardwareRadio) MediaSource.RADIO else MediaSource.PLAYER
     }
 
     Box(
@@ -94,8 +90,7 @@ fun NowPlayingWidget(
             .fillMaxSize()
             .clip(RoundedCornerShape(4.dp))
     ) {
-        // 1. CONDITIONAL VIEW TOGGLE
-        if (selectedSource == "FM/AM Radio") {
+        if (selectedSource == MediaSource.RADIO) {
             // Real-tuner radio deck — mirrors the MCU or the radio app's session
             Box(
                 modifier = Modifier
@@ -106,6 +101,8 @@ fun NowPlayingWidget(
                     accent = accent,
                     isDayMode = isDayMode,
                     hardwareRadio = hardwareRadio,
+                    presets = radioPresets,
+                    onSetPreset = onSetRadioPreset,
                     onLaunchHardwareRadio = onLaunchHardwareRadio,
                     onStopHardwareRadio = onStopHardwareRadio,
                     onRadioSeekUp = onRadioSeekUp,
@@ -138,7 +135,6 @@ fun NowPlayingWidget(
             )
         }
 
-        // 2. FLOATING MULTI-SOURCE SELECTOR (Top-Right, always overlayed)
         var menuExpanded by remember { mutableStateOf(false) }
         val selectorIconColor = if (isDayMode) Color.Black.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
         
@@ -168,7 +164,7 @@ fun NowPlayingWidget(
                 DropdownMenuItem(
                     text = { Text("Any Player", color = dropdownText, fontSize = 11.sp) },
                     onClick = {
-                        selectedSource = "Any Player"
+                        selectedSource = MediaSource.PLAYER
                         menuExpanded = false
                     },
                     leadingIcon = { Icon(Icons.Default.MusicNote, null, tint = accent, modifier = Modifier.size(14.dp)) }
@@ -176,7 +172,7 @@ fun NowPlayingWidget(
                 DropdownMenuItem(
                     text = { Text("FM/AM Radio", color = dropdownText, fontSize = 11.sp) },
                     onClick = {
-                        selectedSource = "FM/AM Radio"
+                        selectedSource = MediaSource.RADIO
                         menuExpanded = false
                     },
                     leadingIcon = { Icon(Icons.Default.Radio, null, tint = accent, modifier = Modifier.size(14.dp)) }
@@ -199,6 +195,8 @@ private fun RadioDeck(
     accent: Color,
     isDayMode: Boolean,
     hardwareRadio: com.openlauncher.app.viewmodel.LauncherViewModel.HardwareRadioState?,
+    presets: RadioPresets,
+    onSetPreset: (index: Int, isFm: Boolean, freq: Float) -> Unit,
     onLaunchHardwareRadio: () -> Unit,
     onStopHardwareRadio: () -> Unit,
     onRadioSeekUp: () -> Unit,
@@ -256,12 +254,9 @@ private fun RadioDeck(
         return
     }
 
-    // Power is a local veil over the live source: stopping doesn't always clear
-    // the vendor state, so a fresh emission flips it back on (radio re-engaged)
-    var isManuallyOff by remember { mutableStateOf(false) }
-    LaunchedEffect(hardwareRadio) {
-        if (isManuallyOff) isManuallyOff = false
-    }
+    // The power button stays where the driver puts it. An incoming vendor update
+    // used to switch it back on within a second of every press.
+    var isManuallyOff by rememberSaveable { mutableStateOf(false) }
     val powerOn = !isManuallyOff
 
     val displayBand = hardwareRadio.band.uppercase()
@@ -402,18 +397,15 @@ private fun RadioDeck(
 
         // ── Presets: only when the backend supports direct frequency tuning ──
         if (hardwareRadio.canTune) {
-            var fmPresets by rememberSaveable { mutableStateOf(listOf(88.5f, 91.5f, 98.1f, 101.9f, 104.3f, 107.5f)) }
-            var amPresets by rememberSaveable { mutableStateOf(listOf(540f, 680f, 820f, 1040f, 1260f, 1420f)) }
             val isFm           = !hardwareRadio.isAm
-            val currentPresets = if (isFm) fmPresets else amPresets
+            val currentPresets = if (isFm) presets.fm else presets.am
             val tolerance      = if (isFm) 0.15f else 5f
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                for (pIdx in 0 until 6) {
-                    val presetFreq = currentPresets[pIdx]
+                currentPresets.forEachIndexed { pIdx, presetFreq ->
                     val isTuned    = freqFloat != null && abs(freqFloat - presetFreq) < tolerance
                     val presetBg = when {
                         isTuned && isDayMode -> Color(0xFF222222)
@@ -448,13 +440,8 @@ private fun RadioDeck(
                             .combinedClickable(
                                 enabled = powerOn,
                                 onClick = { onRadioTune(displayBand, presetFreq) },
-                                onLongClick = {
-                                    // Store the REAL current frequency on this preset
-                                    freqFloat?.let { f ->
-                                        if (isFm) fmPresets = fmPresets.toMutableList().also { it[pIdx] = f }
-                                        else      amPresets = amPresets.toMutableList().also { it[pIdx] = f }
-                                    }
-                                }
+                                // A long press stores the live frequency on this key.
+                                onLongClick = { freqFloat?.let { onSetPreset(pIdx, isFm, it) } }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -530,13 +517,8 @@ private fun StandardMinimalPlayer(
     onTapToOpenApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    
-    // UI Theme colors
     val idleIconColor = if (isDayMode) Color(0xFF555555) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
-    val idleTextColor = if (isDayMode) Color(0xFF555555) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
-    val contentTextColor = if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
-    val subTextColor = if (isDayMode) Color(0xFF666666) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.30f)
+    val idleTextColor = idleIconColor
 
     Box(modifier = modifier) {
         if (!hasContent) {
@@ -614,17 +596,17 @@ private fun StandardMinimalPlayer(
                 }
             }
 
-            // Draw Album Art as background with smooth blur overlay if present
+            // Album art fills the cell, so its text always sits on a dark surface.
             val hasAlbumArt = nonNullState.albumArt != null
-            val useDarkTheme = hasAlbumArt || !isDayMode
+            val onArtwork = hasAlbumArt || !isDayMode
 
             val currentTextColor = if (hasAlbumArt) Color.White else if (isDayMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground
             val currentSubTextColor = if (hasAlbumArt) Color.White.copy(alpha = 0.6f) else if (isDayMode) Color(0xFF666666) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            val currentProgressColor = if (useDarkTheme) accent else if (isDayMode) Color(0xFF111111) else accent
+            val currentProgressColor = if (onArtwork) accent else Color(0xFF111111)
             val currentProgressTrack = currentTextColor.copy(alpha = 0.15f)
             val currentIconColor = currentTextColor.copy(alpha = 0.75f)
-            val currentPlayBgColor = if (useDarkTheme) accent.copy(alpha = 0.9f) else if (isDayMode) Color(0xFF111111) else accent.copy(alpha = 0.9f)
-            val currentPlayIconColor = if (useDarkTheme) Color.Black else Color.White
+            val currentPlayBgColor = if (onArtwork) accent.copy(alpha = 0.9f) else Color(0xFF111111)
+            val currentPlayIconColor = if (onArtwork) Color.Black else Color.White
 
             if (hasAlbumArt) {
                 // Prefer the full-resolution art URI when the source app provides

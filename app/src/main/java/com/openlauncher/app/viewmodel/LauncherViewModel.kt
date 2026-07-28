@@ -3,13 +3,18 @@ package com.openlauncher.app.viewmodel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.database.ContentObserver
+import android.graphics.drawable.Drawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings as AndroidSettings
+import android.util.LruCache
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.openlauncher.app.data.AppSettings
@@ -17,13 +22,18 @@ import com.openlauncher.app.data.DayNightMode
 import com.openlauncher.app.data.DefaultShortcutIcon
 import com.openlauncher.app.data.GRID_COLS
 import com.openlauncher.app.data.GRID_ROWS
+import com.openlauncher.app.data.LevelReference
 import com.openlauncher.app.data.SettingsRepository
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.data.SoundPadConfig
+import com.openlauncher.app.data.TripState
 import com.openlauncher.app.data.WeatherApi
+import com.openlauncher.app.data.WidgetConfig
 import com.openlauncher.app.data.activeWidgetIds
+import com.openlauncher.app.data.activeWidgets
 import com.openlauncher.app.data.computeWidgetMove
 import com.openlauncher.app.data.defaultShortcuts
+import com.openlauncher.app.data.freeGridArea
 import com.openlauncher.app.util.SunriseSunset
 import com.openlauncher.app.model.AppInfo
 import com.openlauncher.app.model.NavDestination
@@ -34,6 +44,11 @@ import com.openlauncher.app.util.LocationCompassManager
 import com.openlauncher.app.util.LocationData
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+
+private const val WEATHER_INTERVAL_MS = 30 * 60 * 1000L
+private const val WEATHER_RETRY_MS = 60 * 1000L
+private const val TRIP_FLUSH_MS = 15 * 1000L
+private const val ICON_CACHE_SIZE = 48
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -53,6 +68,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun resetSettings() {
+        _trip.value = TripState()
+        iconMisses.clear()
         viewModelScope.launch { settingsRepo.resetToDefaults() }
     }
 
@@ -95,6 +112,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun reorderShortcut(from: Int, to: Int) {
         updateSettings {
             copy(shortcuts = shortcuts.toMutableList().also { list ->
+                if (from !in list.indices) return@updateSettings this
                 val item = list.removeAt(from)
                 list.add(to.coerceIn(0, list.size), item)
             })
@@ -117,7 +135,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     enum class AppPickerTarget { CARPLAY, ANDROID_AUTO, PIP, RADIO }
 
     private val _appPickerTarget = MutableStateFlow<AppPickerTarget?>(null)
-    val carPlayPickerActive: StateFlow<Boolean> = MutableStateFlow(false) // kept for compat
     val appPickerTarget: StateFlow<AppPickerTarget?> = _appPickerTarget
 
     fun startCarPlayPicker() {
@@ -157,23 +174,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun clearPipApp()          { updateSettings { copy(pipAppPackage = "") } }
     fun clearRadioApp()        { updateSettings { copy(radioPackage = "") } }
 
+    fun cancelCarPlayPicker() {
+        _appPickerTarget.value = null
+    }
+
+    // ── Widget layout ─────────────────────────────────────────────────────────
     fun updateWidgetConfig(id: String, spanX: Int, spanY: Int) {
         updateSettings {
+            val target = widgetLayout.find { it.id == id } ?: return@updateSettings this
             val resized = widgetLayout.map { w ->
                 if (w.id == id) w.copy(
                     spanX = spanX.coerceIn(1, GRID_COLS - w.gridX),
                     spanY = spanY.coerceIn(1, GRID_ROWS - w.gridY)
                 ) else w
             }
-            // Re-run collision resolution so enlarging a widget pushes neighbors
-            // aside instead of stacking on top of them
             val activeIds = activeWidgetIds()
             val active    = resized.filter { it.enabled && it.id in activeIds }
             val inactive  = resized.filter { !it.enabled || it.id !in activeIds }
-            val target    = active.find { it.id == id }
-            copy(widgetLayout = if (target != null)
-                computeWidgetMove(active, id, target.gridX, target.gridY) + inactive
-            else resized)
+            // Re-run collision resolution so a larger widget pushes its neighbours
+            // aside instead of covering them.
+            copy(widgetLayout = computeWidgetMove(active, id, target.gridX, target.gridY) + inactive)
         }
     }
 
@@ -188,110 +208,147 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun addWidget(id: String) {
         updateSettings {
-            val activeIds = activeWidgetIds()
-            var layout    = widgetLayout
-            var cell      = freeCellIn(layout, activeIds)
+            val shown = withWidgetShown(id)
+            var layout = shown.widgetLayout
+            var neighbours = shown.copy(widgetLayout = layout).activeWidgets().filter { it.id != id }
 
-            // If grid is full, shrink the largest multi-cell widget by one span to make room
-            if (cell == null) {
-                val candidate = layout
-                    .filter { it.enabled && it.id in activeIds && it.spanX * it.spanY > 1 }
-                    .maxByOrNull { it.spanX * it.spanY }
-                if (candidate != null) {
-                    layout = layout.map { w ->
-                        if (w.id == candidate.id)
-                            if (w.spanY > 1) w.copy(spanY = w.spanY - 1) else w.copy(spanX = w.spanX - 1)
-                        else w
-                    }
-                    cell = freeCellIn(layout, activeIds)
-                }
+            if (freeGridArea(neighbours, 1, 1) == null) {
+                layout = shrinkLargestWidget(shown.copy(widgetLayout = layout), id)
+                neighbours = shown.copy(widgetLayout = layout).activeWidgets().filter { it.id != id }
             }
+            val cell = freeGridArea(neighbours, 1, 1) ?: return@updateSettings this
 
-            val cell_ = cell ?: return@updateSettings this
+            val index = layout.indexOfFirst { it.id == id }
+            if (index < 0) {
+                return@updateSettings shown.copy(
+                    widgetLayout = layout + WidgetConfig(id, cell.first, cell.second)
+                )
+            }
+            val existing = layout[index]
+            // Keep the previous span when a free area still fits it; otherwise place
+            // a single cell so the widget cannot overlap a neighbour.
+            val area = if (existing.spanX > 1 || existing.spanY > 1)
+                freeGridArea(neighbours, existing.spanX, existing.spanY) else null
+            val placed = if (area != null)
+                existing.copy(enabled = true, gridX = area.first, gridY = area.second)
+            else
+                existing.copy(enabled = true, gridX = cell.first, gridY = cell.second, spanX = 1, spanY = 1)
 
-            val withShow = when (id) {
-                "CLOCK"       -> copy(showClock = true)
-                "WEATHER"     -> copy(showWeather = true)
-                "NOW_PLAYING" -> copy(showNowPlaying = true)
-                "TELEMETRY"   -> copy(showTelemetry = true)
-                "ALTIMETER"   -> copy(showAltimeter = true)
-                "SPEEDOMETER" -> copy(showSpeedometer = true)
-                "VITALS"      -> copy(showVitals = true)
-                "TRIP_TRACKER" -> copy(showTripTracker = true)
-                "SOUNDBOARD"  -> copy(showSoundboard = true)
-                else          -> this
-            }
-            val idx       = layout.indexOfFirst { it.id == id }
-            val newLayout = if (idx >= 0) layout.toMutableList().also { list ->
-                val w = list[idx]
-                // Try to keep the widget's previous span; if no free area fits it,
-                // fall back to 1×1 at the free cell so it can't overlap neighbors
-                val area = if (w.spanX > 1 || w.spanY > 1) freeAreaIn(layout, activeIds, w.spanX, w.spanY) else null
-                list[idx] = if (area != null)
-                    w.copy(enabled = true, gridX = area.first, gridY = area.second)
-                else
-                    w.copy(enabled = true, gridX = cell_.first, gridY = cell_.second, spanX = 1, spanY = 1)
-            } else {
-                layout + com.openlauncher.app.data.WidgetConfig(id, cell_.first, cell_.second)
-            }
-            withShow.copy(widgetLayout = newLayout)
+            shown.copy(widgetLayout = layout.toMutableList().also { it[index] = placed })
         }
     }
 
     fun removeWidget(id: String) {
-        updateSettings {
-            when (id) {
-                "CLOCK"       -> copy(showClock = false)
-                "WEATHER"     -> copy(showWeather = false)
-                "NOW_PLAYING" -> copy(showNowPlaying = false)
-                "TELEMETRY"   -> copy(showTelemetry = false)
-                "ALTIMETER"   -> copy(showAltimeter = false)
-                "SPEEDOMETER" -> copy(showSpeedometer = false)
-                "VITALS"      -> copy(showVitals = false)
-                "TRIP_TRACKER" -> copy(showTripTracker = false)
-                "SOUNDBOARD"  -> copy(showSoundboard = false)
-                else          -> this
+        updateSettings { withWidgetShown(id, shown = false) }
+    }
+
+    private fun AppSettings.withWidgetShown(id: String, shown: Boolean = true): AppSettings = when (id) {
+        "CLOCK"        -> copy(showClock = shown)
+        "WEATHER"      -> copy(showWeather = shown)
+        "NOW_PLAYING"  -> copy(showNowPlaying = shown)
+        "TELEMETRY"    -> copy(showTelemetry = shown)
+        "ALTIMETER"    -> copy(showAltimeter = shown)
+        "SPEEDOMETER"  -> copy(showSpeedometer = shown)
+        "VITALS"       -> copy(showVitals = shown)
+        "TRIP_TRACKER" -> copy(showTripTracker = shown)
+        "SOUNDBOARD"   -> copy(showSoundboard = shown)
+        else           -> this
+    }
+
+    private fun shrinkLargestWidget(settings: AppSettings, excludeId: String): List<WidgetConfig> {
+        val candidate = settings.activeWidgets()
+            .filter { it.id != excludeId && it.spanX * it.spanY > 1 }
+            .maxByOrNull { it.spanX * it.spanY }
+            ?: return settings.widgetLayout
+        return settings.widgetLayout.map { w ->
+            when {
+                w.id != candidate.id -> w
+                w.spanY > 1          -> w.copy(spanY = w.spanY - 1)
+                else                 -> w.copy(spanX = w.spanX - 1)
             }
         }
     }
 
     fun updateSoundboardPad(index: Int, pad: SoundPadConfig) {
         updateSettings {
-            // Persisted lists from older versions may be shorter than the 6 pads
-            // the widget displays — pad before assigning to avoid IndexOutOfBounds
             val padded = soundboardPads.toMutableList()
-            while (padded.size <= index) padded.add(SoundPadConfig("+", synthType = ""))
+            while (padded.size <= index) padded.add(SoundPadConfig())
             padded[index] = pad
             copy(soundboardPads = padded)
         }
     }
 
-    private fun freeCellIn(
-        layout: List<com.openlauncher.app.data.WidgetConfig>,
-        activeIds: Set<String>
-    ): Pair<Int, Int>? = freeAreaIn(layout, activeIds, 1, 1)
+    // ── Trip tracker ──────────────────────────────────────────────────────────
+    // The trip runs here, not in the widget, so the totals keep counting while the
+    // driver looks at another screen and survive a restart of the head unit.
+    private val _trip = MutableStateFlow(TripState())
+    val trip: StateFlow<TripState> = _trip
 
-    private fun freeAreaIn(
-        layout: List<com.openlauncher.app.data.WidgetConfig>,
-        activeIds: Set<String>,
-        spanX: Int,
-        spanY: Int
-    ): Pair<Int, Int>? {
-        val occupied = buildSet<Pair<Int, Int>> {
-            layout.filter { it.enabled && it.id in activeIds }.forEach { w ->
-                for (dx in 0 until w.spanX) for (dy in 0 until w.spanY) add(w.gridX + dx to w.gridY + dy)
-            }
-        }
-        for (row in 0 until GRID_ROWS) for (col in 0 until GRID_COLS) {
-            if (col + spanX > GRID_COLS || row + spanY > GRID_ROWS) continue
-            if ((0 until spanX).all { dx -> (0 until spanY).all { dy -> (col + dx to row + dy) !in occupied } })
-                return col to row
-        }
-        return null
+    fun toggleTrip() {
+        _trip.value = _trip.value.copy(running = !_trip.value.running)
+        persistTrip()
     }
 
-    fun cancelCarPlayPicker() {
-        _appPickerTarget.value = null
+    fun resetTrip() {
+        _trip.value = _trip.value.copy(
+            distanceMeters = 0.0,
+            driveSeconds = 0.0,
+            idleSeconds = 0.0,
+            speedSumMps = 0.0,
+            movingSeconds = 0.0
+        )
+        persistTrip()
+    }
+
+    fun recordAccelTime(seconds: Float) {
+        val best = _trip.value.bestAccelSeconds
+        if (best != null && best <= seconds) return
+        _trip.value = _trip.value.copy(bestAccelSeconds = seconds)
+        persistTrip()
+    }
+
+    fun clearAccelRecord() {
+        _trip.value = _trip.value.copy(bestAccelSeconds = null)
+        persistTrip()
+    }
+
+    private fun persistTrip() {
+        val snapshot = _trip.value
+        updateSettings { copy(trip = snapshot) }
+    }
+
+    private suspend fun runTripLoop() {
+        _trip.value = settingsRepo.settingsFlow.first().trip
+        var lastTickMs = SystemClock.elapsedRealtime()
+        var lastFlushMs = lastTickMs
+        while (true) {
+            delay(1000)
+            val now = SystemClock.elapsedRealtime()
+            // Measure the real interval instead of an assumed one second per tick.
+            val dtSeconds = ((now - lastTickMs) / 1000.0).coerceIn(0.0, 5.0)
+            lastTickMs = now
+            val state = _trip.value
+            if (!state.running) continue
+            val speedMps = locationMgr.location.value?.speedMps ?: 0f
+            _trip.value = if (speedMps > 0.5f) state.copy(
+                distanceMeters = state.distanceMeters + speedMps * dtSeconds,
+                driveSeconds   = state.driveSeconds + dtSeconds,
+                speedSumMps    = state.speedSumMps + speedMps * dtSeconds,
+                movingSeconds  = state.movingSeconds + dtSeconds
+            ) else state.copy(idleSeconds = state.idleSeconds + dtSeconds)
+            if (now - lastFlushMs >= TRIP_FLUSH_MS) {
+                lastFlushMs = now
+                persistTrip()
+            }
+        }
+    }
+
+    fun setLevelReference(reference: LevelReference) {
+        updateSettings { copy(levelReference = reference) }
+    }
+
+    fun clearLevelReference() {
+        updateSettings { copy(levelReference = LevelReference()) }
     }
 
     // ── Rearrange mode ────────────────────────────────────────────────────────
@@ -308,26 +365,45 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _appsLoading = MutableStateFlow(false)
     val appsLoading: StateFlow<Boolean> = _appsLoading
 
+    // Drawables are heavy. A bounded cache keeps the visible tiles fast without
+    // holding an icon for every installed package for the life of the process.
+    private val iconCache = LruCache<String, Drawable>(ICON_CACHE_SIZE)
+    // A shortcut can point at an app that is absent. Recording the miss keeps the
+    // sidebar off the package manager on every drag frame.
+    private val iconMisses = mutableSetOf<String>()
+
+    fun iconFor(packageName: String): Drawable? {
+        if (packageName.isEmpty() || packageName in iconMisses) return null
+        iconCache.get(packageName)?.let { return it }
+        val loaded = runCatching {
+            getApplication<Application>().packageManager.getApplicationIcon(packageName)
+        }.getOrNull()
+        if (loaded == null) {
+            iconMisses.add(packageName)
+            return null
+        }
+        iconCache.put(packageName, loaded)
+        return loaded
+    }
+
     fun loadInstalledApps() {
         if (_appsLoading.value) return
+        _appsLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            _appsLoading.value = true
             val pm = getApplication<Application>().packageManager
-
-            // Use getInstalledApplications — same source Android Settings uses,
-            // catches apps with no launcher/ACTION_MAIN activity (e.g. CarPlay companions)
+            // getInstalledApplications is the source Android Settings uses. It also
+            // returns apps without a launcher activity, such as CarPlay companions.
             _apps.value = pm.getInstalledApplications(0)
                 .mapNotNull { appInfo ->
-                    try {
+                    runCatching {
                         val label = pm.getApplicationLabel(appInfo).toString()
-                        if (label.isBlank()) return@mapNotNull null
+                        if (label.isBlank()) return@runCatching null
                         AppInfo(
                             packageName = appInfo.packageName,
                             appName     = label,
-                            icon        = pm.getApplicationIcon(appInfo),
                             isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
                         )
-                    } catch (_: Exception) { null }
+                    }.getOrNull()
                 }
                 .distinctBy { it.packageName }
                 .sortedBy { it.appName }
@@ -338,7 +414,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun launchApp(packageName: String) {
         val app = getApplication<Application>()
         val pm  = app.packageManager
-        // Try standard launch intent first; fall back to first ACTION_MAIN activity in package
+        // Try the standard launch intent first, then the first ACTION_MAIN activity.
         val intent = pm.getLaunchIntentForPackage(packageName)
             ?: pm.queryIntentActivities(
                 Intent(Intent.ACTION_MAIN).setPackage(packageName), 0
@@ -348,7 +424,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             }
-        intent?.let { app.startActivity(it) }
+        if (intent == null) {
+            showToast("Cannot open $packageName")
+            return
+        }
+        val started = runCatching { app.startActivity(intent) }.isSuccess
+        if (!started) showToast("Cannot open $packageName")
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
     }
 
     // ── Now Playing ───────────────────────────────────────────────────────────
@@ -373,28 +458,25 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _weatherError = MutableStateFlow<String?>(null)
     val weatherError: StateFlow<String?> = _weatherError
 
-    private var weatherJob: Job? = null
-
-    fun fetchWeather(lat: Double, lon: Double, metric: Boolean) {
-        weatherJob?.cancel()
-        weatherJob = viewModelScope.launch {
-            try {
-                // Always request celsius — the state stores celsius and the widget
-                // converts for display, so requesting fahrenheit just round-tripped
-                // the value through two lossy conversions
-                val resp = WeatherApi.service.getForecast(lat, lon, temperatureUnit = "celsius")
-                resp.currentWeather?.let { cw ->
-                    _weather.value = WeatherState(
-                        temperatureCelsius = cw.temperature,
-                        weatherCode       = cw.weathercode,
-                        windspeedKmh      = cw.windspeed,
-                        isDay             = cw.isDay == 1
-                    )
-                }
-                _weatherError.value = null
-            } catch (e: Exception) {
-                _weatherError.value = e.message
-            }
+    private suspend fun fetchWeather(lat: Double, lon: Double): Boolean {
+        return try {
+            // The state stores celsius and the widget converts for display, so a
+            // fahrenheit request would round-trip through two lossy conversions.
+            val resp = WeatherApi.service.getForecast(lat, lon, temperatureUnit = "celsius")
+            val current = resp.currentWeather ?: return false
+            _weather.value = WeatherState(
+                temperatureCelsius = current.temperature,
+                weatherCode        = current.weathercode,
+                windspeedKmh       = current.windspeed,
+                isDay              = current.isDay == 1
+            )
+            _weatherError.value = null
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _weatherError.value = e.message ?: "No connection"
+            false
         }
     }
 
@@ -405,16 +487,25 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val compassBearing: StateFlow<Float> = locationMgr.bearing
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
 
-    // Re-evaluated every minute: a parked car produces no location updates
-    // (minDistance filters), so AUTO mode must also flip on time alone.
+    val gravity: StateFlow<FloatArray?> = locationMgr.gravity
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    // A parked car produces no location updates, so AUTO mode must also flip on
+    // time alone.
     private val minuteTicker = flow { while (true) { emit(Unit); delay(60_000L) } }
+
+    private fun systemPrefersDay(): Boolean {
+        val mode = getApplication<Application>().resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK
+        return mode != Configuration.UI_MODE_NIGHT_YES
+    }
 
     val isDayMode: StateFlow<Boolean> = combine(settings, locationMgr.location, minuteTicker) { s, loc, _ ->
         when (s.dayNightMode) {
             DayNightMode.DARK   -> false
             DayNightMode.LIGHT  -> true
             DayNightMode.AUTO   -> if (loc != null) SunriseSunset.isDay(loc.latitude, loc.longitude) else false
-            DayNightMode.SYSTEM -> false // placeholder — overridden in MainActivity via isSystemInDarkTheme()
+            DayNightMode.SYSTEM -> systemPrefersDay()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -583,6 +674,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         sendMcuByteArray(finalPayload)
     }
 
+    fun setRadioPreset(index: Int, isFm: Boolean, freq: Float) {
+        updateSettings {
+            val presets = if (isFm) radioPresets.fm else radioPresets.am
+            if (index !in presets.indices) return@updateSettings this
+            val updated = presets.toMutableList().also { it[index] = freq }
+            copy(radioPresets = if (isFm) radioPresets.copy(fm = updated) else radioPresets.copy(am = updated))
+        }
+    }
+
     private val mcuActive get() = _mcuRadio.value != null
 
     // Seek routes to the MCU when that backend is live, otherwise to the radio
@@ -592,8 +692,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     // Band switching and direct tuning only exist on the MCU backend
     fun radioCycleFm()  { if (mcuActive) sendMcuBytes(0x02, 0x1e) }
     fun radioSwitchAm() { if (mcuActive) sendMcuBytes(0x02, 0x1f) }
-    fun radioStart()    { sendMcuBytes(0x01, 0x01) }
-    fun radioStop()     { sendMcuBytes(0x01, 0x63) }
+    fun radioStart()    { if (hasSzchoicewayMcu) sendMcuBytes(0x01, 0x01) }
+    fun radioStop()     { if (hasSzchoicewayMcu) sendMcuBytes(0x01, 0x63) }
 
     fun stopHardwareRadioApp() {
         if (mcuActive) radioStop()
@@ -601,7 +701,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun launchHardwareRadioApp() {
-        if (hasSzchoicewayMcu) radioStart()
+        radioStart()
         val pkg = settings.value.radioPackage.ifEmpty {
             when {
                 hasSzchoicewayMcu -> "com.szchoiceway.radio"
@@ -654,20 +754,22 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         loadInstalledApps()
         refreshConnectivity()
         if (hasSzchoicewayMcu) startHardwareRadioObserver()
-        // Fetch weather on first location fix, then every 30 minutes.
-        // The minute ticker covers the parked case where no location updates arrive.
-        viewModelScope.launch {
-            var lastFetchMs = 0L
-            merge(
-                locationMgr.location.filterNotNull(),
-                minuteTicker.mapNotNull { locationMgr.location.value }
-            ).collect { loc ->
-                val now = System.currentTimeMillis()
-                if (now - lastFetchMs >= 30 * 60 * 1_000L) {
-                    lastFetchMs = now
-                    fetchWeather(loc.latitude, loc.longitude, settings.value.unitSystem.name == "METRIC")
-                }
-            }
+        viewModelScope.launch { runWeatherLoop() }
+        viewModelScope.launch { runTripLoop() }
+    }
+
+    // A head unit starts before the network attaches, so a failed request must
+    // retry in a minute instead of holding the full refresh interval.
+    private suspend fun runWeatherLoop() {
+        var nextAttemptMs = 0L
+        merge(
+            locationMgr.location.filterNotNull(),
+            minuteTicker.mapNotNull { locationMgr.location.value }
+        ).collect { loc ->
+            val now = System.currentTimeMillis()
+            if (now < nextAttemptMs) return@collect
+            val ok = fetchWeather(loc.latitude, loc.longitude)
+            nextAttemptMs = now + if (ok) WEATHER_INTERVAL_MS else WEATHER_RETRY_MS
         }
     }
 }

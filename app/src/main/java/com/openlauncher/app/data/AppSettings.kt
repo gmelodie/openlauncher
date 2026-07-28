@@ -2,14 +2,32 @@ package com.openlauncher.app.data
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import kotlinx.serialization.Serializable
 
+private val GRUVBOX_ORANGE    = Color(0xFFD65D0E).toArgb()
+private val GRUVBOX_CREAM     = Color(0xFFFBF1C7).toArgb()
+private val GRUVBOX_LIGHT_INK = Color(0xFFEBDBB2).toArgb()
+private val BLACK_ARGB        = Color.Black.toArgb()
+
+@Serializable
 enum class ClockStyle { DIGITAL, ANALOG }
+
+@Serializable
 enum class UnitSystem { METRIC, IMPERIAL }
+
+@Serializable
 enum class AppFont { SYSTEM, JETBRAINS_MONO, SOURCE_CODE_PRO }
+
+@Serializable
 enum class DayNightMode { DARK, LIGHT, AUTO, SYSTEM }
+
+@Serializable
 enum class SidebarPosition { LEFT, RIGHT, BOTTOM }
+
+@Serializable
 enum class GradientDirection { TOP_TO_BOTTOM, LEFT_TO_RIGHT, DIAGONAL, RADIAL }
 
+@Serializable
 enum class DefaultShortcutIcon {
     NONE,
     // Navigation & vehicle
@@ -26,21 +44,25 @@ enum class DefaultShortcutIcon {
     GLOBE
 }
 
+@Serializable
 data class SoundPadConfig(
-    val label: String,
+    val label: String = "+",
     val audioUri: String = "",
-    val synthType: String = "BEEP"
-)
+    val soundName: String = ""
+) {
+    val isAssigned: Boolean get() = audioUri.isNotEmpty() || soundName.isNotEmpty()
+}
 
 fun defaultSoundboardPads() = listOf(
-    SoundPadConfig("mario_jump",   synthType = "mario_jump"),
-    SoundPadConfig("mario_coin",   synthType = "mario_coin"),
-    SoundPadConfig("boom",         synthType = "boom"),
-    SoundPadConfig("loud_fart",    synthType = "loud_fart"),
-    SoundPadConfig("+",            synthType = ""),
-    SoundPadConfig("+",            synthType = "")
+    SoundPadConfig("mario_jump", soundName = "mario_jump"),
+    SoundPadConfig("mario_coin", soundName = "mario_coin"),
+    SoundPadConfig("boom", soundName = "boom"),
+    SoundPadConfig("loud_fart", soundName = "loud_fart"),
+    SoundPadConfig(),
+    SoundPadConfig()
 )
 
+@Serializable
 data class ShortcutConfig(
     val packageName: String = "",
     val label: String = "",
@@ -53,23 +75,38 @@ data class ShortcutConfig(
 const val GRID_COLS = 3
 const val GRID_ROWS = 2
 
+@Serializable
 data class WidgetConfig(
-    val id: String,          // "CLOCK" | "WEATHER" | "TELEMETRY" | "NOW_PLAYING"
-    val gridX: Int,          // column 0..(GRID_COLS-1)
-    val gridY: Int,          // row    0..(GRID_ROWS-1)
+    val id: String = "",
+    val gridX: Int = 0,
+    val gridY: Int = 0,
     val spanX: Int = 1,
     val spanY: Int = 1,
     val enabled: Boolean = true
 )
 
+// Stored layouts come from disk and can hold any number. Clamp them here so the
+// grid math downstream always gets a cell that fits.
+fun WidgetConfig.clampToGrid(): WidgetConfig {
+    val x = gridX.coerceIn(0, GRID_COLS - 1)
+    val y = gridY.coerceIn(0, GRID_ROWS - 1)
+    return copy(
+        gridX = x,
+        gridY = y,
+        spanX = spanX.coerceIn(1, GRID_COLS - x),
+        spanY = spanY.coerceIn(1, GRID_ROWS - y)
+    )
+}
+
+@Serializable
 data class AppSettings(
     val vehicleName: String = "HB20",
     // Gruvbox defaults — mirror ui.theme.Color. Accent (orange) shows in both
     // modes; fontColor is the night-mode ink (cream), so it must stay light —
     // day mode draws its own dark ink and never reads fontColor.
-    val accentColor: Int = Color(0xFFD65D0E).toArgb(),
-    val backgroundColor: Int = Color(0xFFFBF1C7).toArgb(),
-    val fontColor: Int = Color(0xFFEBDBB2).toArgb(),
+    val accentColor: Int = GRUVBOX_ORANGE,
+    val backgroundColor: Int = GRUVBOX_CREAM,
+    val fontColor: Int = GRUVBOX_LIGHT_INK,
     val wallpaperUri: String = "",
     val fontBold: Boolean = false,
     val textScale: Float = 1.2f,
@@ -86,7 +123,7 @@ data class AppSettings(
     val carPlayPackage: String = "",
     val androidAutoPackage: String = "",
     val useGradient: Boolean = false,
-    val gradientEndColor: Int = Color.Black.toArgb(),
+    val gradientEndColor: Int = BLACK_ARGB,
     val wallpaperDim: Float = 0.55f,
     val sidebarPosition: SidebarPosition = SidebarPosition.LEFT,
     val bottomBarShortcutsRight: Boolean = false,
@@ -106,8 +143,39 @@ data class AppSettings(
     val vitalsAsBars: Boolean = false,
     val speedometerDigitalOnly: Boolean = false,
     val gradientDirection: GradientDirection = GradientDirection.DIAGONAL,
-    val useCustomBackgroundColor: Boolean = false
+    val useCustomBackgroundColor: Boolean = false,
+    val trip: TripState = TripState(),
+    val radioPresets: RadioPresets = RadioPresets(),
+    // Gravity vector recorded while the vehicle stands level. All zero means the
+    // altimeter must capture a fresh reference on its next reading.
+    val levelReference: LevelReference = LevelReference()
 )
+
+@Serializable
+data class TripState(
+    val running: Boolean = false,
+    val distanceMeters: Double = 0.0,
+    val driveSeconds: Double = 0.0,
+    val idleSeconds: Double = 0.0,
+    val speedSumMps: Double = 0.0,
+    val movingSeconds: Double = 0.0,
+    val bestAccelSeconds: Float? = null
+)
+
+@Serializable
+data class RadioPresets(
+    val fm: List<Float> = listOf(88.5f, 91.5f, 98.1f, 101.9f, 104.3f, 107.5f),
+    val am: List<Float> = listOf(540f, 680f, 820f, 1040f, 1260f, 1420f)
+)
+
+@Serializable
+data class LevelReference(
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val z: Float = 0f
+) {
+    val isSet: Boolean get() = x != 0f || y != 0f || z != 0f
+}
 
 // Pre-wired to the driver's most-used apps. packageName launches directly when
 // the app is installed; when it is not, the slot falls back to its default
@@ -137,6 +205,11 @@ fun AppSettings.activeWidgetIds(): Set<String> = buildSet {
     if (showVitals) add("VITALS")
     if (showTripTracker) add("TRIP_TRACKER")
     if (showSoundboard) add("SOUNDBOARD")
+}
+
+fun AppSettings.activeWidgets(): List<WidgetConfig> {
+    val ids = activeWidgetIds()
+    return widgetLayout.filter { it.enabled && it.id in ids }
 }
 
 /**
@@ -177,6 +250,9 @@ fun computeWidgetMove(
 
     return result
 }
+
+fun freeGridArea(layout: List<WidgetConfig>, spanX: Int, spanY: Int): Pair<Int, Int>? =
+    firstFreeGridPos(spanX, spanY, buildOccupied(layout))
 
 private fun buildOccupied(widgets: List<WidgetConfig>) = buildSet<Pair<Int, Int>> {
     widgets.forEach { w -> for (dx in 0 until w.spanX) for (dy in 0 until w.spanY) add(w.gridX + dx to w.gridY + dy) }

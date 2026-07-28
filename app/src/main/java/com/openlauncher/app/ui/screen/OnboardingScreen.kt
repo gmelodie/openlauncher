@@ -33,15 +33,30 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.openlauncher.app.data.AppSettings
+import com.openlauncher.app.BuildConfig
+import com.openlauncher.app.ui.theme.GruvLightBg0
+import com.openlauncher.app.ui.theme.GruvLightBg1
+import com.openlauncher.app.ui.theme.GruvLightBg2
+import com.openlauncher.app.ui.theme.GruvLightBg3
+import com.openlauncher.app.ui.theme.GruvLightFg1
+import com.openlauncher.app.ui.theme.GruvLightFg3
+import com.openlauncher.app.util.openHomeSettings
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun OnboardingScreen(
     accent: Color,
     onComplete: () -> Unit,
+    isDayMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val pageBg    = if (isDayMode) GruvLightBg0 else Color(0xFF070707)
+    val paneBg    = if (isDayMode) GruvLightBg1 else Color(0xFF0F0F0F)
+    val separator = if (isDayMode) GruvLightBg3 else Color(0xFF1E1E1E)
+    val titleText = if (isDayMode) GruvLightFg1 else Color.White
+    val bodyText  = if (isDayMode) GruvLightFg3 else Color(0xFFAAAAAA)
+    val mutedText = if (isDayMode) GruvLightFg3 else Color(0xFF666666)
+    val faintText = if (isDayMode) GruvLightBg3 else Color(0xFF333333)
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -56,10 +71,14 @@ fun OnboardingScreen(
             context, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
+        // Match the package of each listed component. A plain substring test
+        // also accepted any package that merely contains this one.
         val enabledListeners = Settings.Secure.getString(
             context.contentResolver, "enabled_notification_listeners"
-        )
-        mediaGranted = enabledListeners != null && enabledListeners.contains(context.packageName)
+        ).orEmpty()
+        mediaGranted = enabledListeners.split(':')
+            .mapNotNull { android.content.ComponentName.unflattenFromString(it) }
+            .any { it.packageName == context.packageName }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -93,7 +112,7 @@ fun OnboardingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF070707))
+            .background(pageBg)
     ) {
         // Aesthetic glowing background orb
         Box(
@@ -117,7 +136,7 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .weight(0.4f)
                     .fillMaxHeight()
-                    .background(Color(0xFF0F0F0F))
+                    .background(paneBg)
                     .padding(32.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -133,13 +152,13 @@ fun OnboardingScreen(
                         text = "OPEN LAUNCHER",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = titleText,
                         letterSpacing = 2.sp,
                         fontSize = 15.sp
                     )
                     Text(
                         text = "Designed for the dashboard",
-                        color = Color(0xFF666666),
+                        color = mutedText,
                         fontSize = 11.sp,
                         letterSpacing = 0.5.sp
                     )
@@ -154,8 +173,8 @@ fun OnboardingScreen(
                 }
 
                 Text(
-                    text = "v0.0.5",
-                    color = Color(0xFF333333),
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    color = faintText,
                     fontSize = 9.sp,
                     letterSpacing = 1.sp
                 )
@@ -166,7 +185,7 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .width(1.dp)
                     .fillMaxHeight()
-                    .background(Color(0xFF1E1E1E))
+                    .background(separator)
             )
 
             // ── Right content wizard ────────────────────────────────────────
@@ -191,8 +210,8 @@ fun OnboardingScreen(
                         label = "step_transition"
                     ) { step ->
                         when (step) {
-                            0 -> IntroStep(accent)
-                            1 -> LocationStep(accent, locationGranted, onGrant = {
+                            0 -> IntroStep(accent, titleText, bodyText, mutedText)
+                            1 -> LocationStep(accent, isDayMode, titleText, bodyText, mutedText, locationGranted, onGrant = {
                                 locationLauncher.launch(
                                     arrayOf(
                                         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -200,15 +219,16 @@ fun OnboardingScreen(
                                     )
                                 )
                             })
-                            2 -> MediaStep(accent, mediaGranted, onGrant = {
+                            2 -> MediaStep(accent, isDayMode, titleText, bodyText, mutedText, mediaGranted, onGrant = {
                                 runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    context.startActivity(
+                                        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
                                 }
                             })
-                            3 -> FinalStep(accent, onSetDefault = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                                }
+                            3 -> FinalStep(accent, titleText, bodyText, paneBg, onSetDefault = {
+                                openHomeSettings(context)
                             })
                         }
                     }
@@ -229,9 +249,9 @@ fun OnboardingScreen(
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.height(44.dp)
                         ) {
-                            Icon(Icons.Default.ArrowBack, null, tint = Color(0xFF888888), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ArrowBack, null, tint = mutedText, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("BACK", color = Color(0xFF888888), fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text("BACK", color = mutedText, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     } else {
                         Spacer(Modifier.width(1.dp))
@@ -280,12 +300,12 @@ fun OnboardingScreen(
                             },
                             shape = RoundedCornerShape(4.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = titleText),
                             modifier = Modifier.height(44.dp)
                         ) {
-                            Text(nextButtonLabel, color = Color.White, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 12.sp)
+                            Text(nextButtonLabel, color = titleText, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 12.sp)
                             Spacer(Modifier.width(8.dp))
-                            Icon(nextButtonIcon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(nextButtonIcon, null, tint = titleText, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -301,7 +321,7 @@ private fun StepItem(stepIndex: Int, title: String, currentStep: Int) {
     val tint = when {
         active -> MaterialTheme.colorScheme.primary
         completed -> Color(0xFF44AA44)
-        else -> Color(0xFF333333)
+        else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
     }
 
     Row(
@@ -325,7 +345,7 @@ private fun StepItem(stepIndex: Int, title: String, currentStep: Int) {
         Text(
             text = title,
             fontSize = 11.sp,
-            color = if (active) Color.White else Color(0xFF666666),
+            color = if (active) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
             letterSpacing = 0.5.sp
         )
@@ -333,7 +353,7 @@ private fun StepItem(stepIndex: Int, title: String, currentStep: Int) {
 }
 
 @Composable
-private fun IntroStep(accent: Color) {
+private fun IntroStep(accent: Color, titleText: Color, bodyText: Color, mutedText: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = "WELCOME TO OPEN LAUNCHER",
@@ -345,7 +365,7 @@ private fun IntroStep(accent: Color) {
         )
         Text(
             text = "A clean, modern landscape dashboard designed to be the ultimate companion for your car's screen.",
-            color = Color(0xFFAAAAAA),
+            color = bodyText,
             fontSize = 13.sp,
             lineHeight = 20.sp
         )
@@ -361,7 +381,15 @@ private fun IntroStep(accent: Color) {
 }
 
 @Composable
-private fun LocationStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
+private fun LocationStep(
+    accent: Color,
+    isDayMode: Boolean,
+    titleText: Color,
+    bodyText: Color,
+    mutedText: Color,
+    isGranted: Boolean,
+    onGrant: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = "TELEMETRY & WEATHER",
@@ -373,7 +401,7 @@ private fun LocationStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit)
         )
         Text(
             text = "To compute your real-time speed, compass bearing, altitude telemetry, and update local weather conditions, Open Launcher requires high-precision GPS services.",
-            color = Color(0xFFAAAAAA),
+            color = bodyText,
             fontSize = 13.sp,
             lineHeight = 20.sp
         )
@@ -384,7 +412,7 @@ private fun LocationStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit)
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (isGranted) Color(0xFF0F1E10) else Color(0xFF1E1010))
+                .background(statusBackground(isGranted, isDayMode))
                 .padding(16.dp)
         ) {
             Row(
@@ -400,13 +428,13 @@ private fun LocationStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit)
                 Column {
                     Text(
                         text = if (isGranted) "Permission Granted" else "Permission Required",
-                        color = Color.White,
+                        color = titleText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = if (isGranted) "GPS telemetry is active and ready." else "Telemetry is currently disabled.",
-                        color = Color(0xFF888888),
+                        color = mutedText,
                         fontSize = 11.sp
                     )
                 }
@@ -430,7 +458,15 @@ private fun LocationStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit)
 }
 
 @Composable
-private fun MediaStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
+private fun MediaStep(
+    accent: Color,
+    isDayMode: Boolean,
+    titleText: Color,
+    bodyText: Color,
+    mutedText: Color,
+    isGranted: Boolean,
+    onGrant: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = "MEDIA INTEGRATION",
@@ -442,7 +478,7 @@ private fun MediaStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
         )
         Text(
             text = "To capture live album art, track info, progress bars, and provide playback control from your dashboard cards, Open Launcher listens to active media notifications.",
-            color = Color(0xFFAAAAAA),
+            color = bodyText,
             fontSize = 13.sp,
             lineHeight = 20.sp
         )
@@ -453,7 +489,7 @@ private fun MediaStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (isGranted) Color(0xFF0F1E10) else Color(0xFF1E1010))
+                .background(statusBackground(isGranted, isDayMode))
                 .padding(16.dp)
         ) {
             Row(
@@ -469,13 +505,13 @@ private fun MediaStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
                 Column {
                     Text(
                         text = if (isGranted) "Notification Access Granted" else "Notification Access Required",
-                        color = Color.White,
+                        color = titleText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = if (isGranted) "Music player widget is connected." else "Now Playing dashboard will remain inactive.",
-                        color = Color(0xFF888888),
+                        color = mutedText,
                         fontSize = 11.sp
                     )
                 }
@@ -499,7 +535,13 @@ private fun MediaStep(accent: Color, isGranted: Boolean, onGrant: () -> Unit) {
 }
 
 @Composable
-private fun FinalStep(accent: Color, onSetDefault: () -> Unit) {
+private fun FinalStep(
+    accent: Color,
+    titleText: Color,
+    bodyText: Color,
+    paneBg: Color,
+    onSetDefault: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             text = "READY FOR THE ROAD!",
@@ -511,7 +553,7 @@ private fun FinalStep(accent: Color, onSetDefault: () -> Unit) {
         )
         Text(
             text = "You are all set up and ready to go. You can set Open Launcher as your default home app so it launches automatically whenever you start your vehicle.",
-            color = Color(0xFFAAAAAA),
+            color = bodyText,
             fontSize = 13.sp,
             lineHeight = 20.sp
         )
@@ -521,14 +563,22 @@ private fun FinalStep(accent: Color, onSetDefault: () -> Unit) {
         Button(
             onClick = onSetDefault,
             shape = RoundedCornerShape(4.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+            colors = ButtonDefaults.buttonColors(containerColor = paneBg),
             modifier = Modifier.height(44.dp)
         ) {
-            Icon(Icons.Default.Home, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Home, null, tint = titleText, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("SET AS DEFAULT", color = Color.White, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 12.sp)
+            Text("SET AS DEFAULT", color = titleText, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 12.sp)
         }
     }
+}
+
+@Composable
+private fun statusBackground(isGranted: Boolean, isDayMode: Boolean): Color = when {
+    isGranted && isDayMode -> GruvLightBg2
+    isGranted              -> Color(0xFF0F1E10)
+    isDayMode              -> Color(0xFFF2D5D5)
+    else                   -> Color(0xFF1E1010)
 }
 
 @Composable
@@ -539,8 +589,8 @@ private fun BulletItem(icon: ImageVector, title: String, desc: String) {
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(18.dp).padding(top = 2.dp))
         Column {
-            Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-            Text(desc, color = Color(0xFF888888), fontSize = 11.sp, lineHeight = 16.sp)
+            Text(title, color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+            Text(desc, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 11.sp, lineHeight = 16.sp)
         }
     }
 }

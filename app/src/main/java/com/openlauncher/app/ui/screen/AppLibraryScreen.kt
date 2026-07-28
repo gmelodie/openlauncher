@@ -1,9 +1,9 @@
 package com.openlauncher.app.ui.screen
 
+import android.graphics.drawable.Drawable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.platform.LocalTextInputService
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +44,7 @@ fun AppLibraryScreen(
     isCarPlayPickerMode: Boolean,
     carPlayPickerLabel: String = "CHOOSE CARPLAY APP",
     accent: Color,
+    iconFor: (String) -> Drawable?,
     onAppClick: (AppInfo) -> Unit,
     onPickerSelect: (Int, AppInfo) -> Unit,
     onCarPlaySelect: (AppInfo) -> Unit,
@@ -182,6 +182,7 @@ fun AppLibraryScreen(
                 AppTile(
                     app     = app,
                     accent  = accent,
+                    icon    = iconFor(app.packageName),
                     onClick = {
                         when {
                             isCarPlayPickerMode            -> onCarPlaySelect(app)
@@ -199,6 +200,7 @@ fun AppLibraryScreen(
 private fun AppTile(
     app: AppInfo,
     accent: Color,
+    icon: Drawable?,
     onClick: () -> Unit
 ) {
     val isDayMode  = LocalDayMode.current
@@ -215,8 +217,8 @@ private fun AppTile(
             .clickable(onClick = onClick)
             .padding(7.dp)
     ) {
-        val bmp = remember(app.packageName) {
-            try { app.icon.toBitmap(80, 80) } catch (_: Exception) { null }
+        val bmp = remember(app.packageName, icon) {
+            icon?.let { runCatching { it.toBitmap(80, 80) }.getOrNull() }
         }
         if (bmp != null) {
             androidx.compose.foundation.Image(

@@ -11,9 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +23,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
+
+private const val NO_READING = "—"
+
+private val THERMAL_PATHS = listOf(
+    "/sys/class/thermal/thermal_zone0/temp",
+    "/sys/class/thermal/thermal_zone1/temp",
+    "/sys/devices/virtual/thermal/thermal_zone0/temp",
+    "/sys/class/hwmon/hwmon0/device/temp1_input"
+)
+
+private data class CpuSample(val active: Long, val idle: Long)
+
+private data class Vitals(
+    val cpuPercent: Float? = null,
+    val ramPercent: Float? = null,
+    val ramUsedGb: Double? = null,
+    val temperatureC: Float? = null
+)
 
 @Composable
 fun VitalsWidget(
@@ -36,137 +54,37 @@ fun VitalsWidget(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val labelColor = if (isDayMode) Color(0xFF666666) else androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    var vitals by remember { mutableStateOf(Vitals()) }
 
-    var cpuUsage by remember { mutableFloatStateOf(20f) }
-    var ramUsedPercent by remember { mutableFloatStateOf(45f) }
-    var ramDisplayGb by remember { mutableStateOf("0.0G") }
-    var temperature by remember { mutableFloatStateOf(35f) }
-
-    // CPU Stat Tracking variables
-    var lastCpuTime by remember { mutableLongStateOf(0L) }
-    var lastIdleTime by remember { mutableLongStateOf(0L) }
-
-    // Temperature tracking helper (Thermal files -> Battery fallback)
-    val getCpuTemp = {
-        val paths = listOf(
-            "/sys/class/thermal/thermal_zone0/temp",
-            "/sys/class/thermal/thermal_zone1/temp",
-            "/sys/devices/virtual/thermal/thermal_zone0/temp",
-            "/sys/class/hwmon/hwmon0/device/temp1_input"
-        )
-        var foundTemp = -1f
-        for (path in paths) {
-            try {
-                val file = File(path)
-                if (file.exists() && file.canRead()) {
-                    val tempStr = file.readText().trim()
-                    var temp = tempStr.toFloatOrNull() ?: continue
-                    if (temp > 1000f) temp /= 1000f
-                    if (temp in 10f..150f) {
-                        foundTemp = temp
-                        break
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        
-        if (foundTemp == -1f) {
-            // Fallback: Battery Temp
-            try {
-                val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-                if (intent != null) {
-                    val rawTemp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
-                    if (rawTemp > 0) {
-                        foundTemp = rawTemp / 10f
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        
-        if (foundTemp != -1f) foundTemp else 38f // global default fallback
-    }
-
-    // Process RAM telemetry
-    val updateRam = {
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val memInfo = ActivityManager.MemoryInfo()
-            am.getMemoryInfo(memInfo)
-            
-            val availGb = memInfo.availMem.toDouble() / (1024.0 * 1024.0 * 1024.0)
-            val totalGb = memInfo.totalMem.toDouble() / (1024.0 * 1024.0 * 1024.0)
-            val usedGb = totalGb - availGb
-            
-            ramUsedPercent = ((usedGb / totalGb) * 100f).toFloat().coerceIn(0f, 100f)
-            ramDisplayGb = "%.1fG".format(usedGb)
-        } catch (_: Exception) {
-            ramUsedPercent = 50f
-            ramDisplayGb = "—"
-        }
-    }
-
-    // Process CPU telemetry
-    val updateCpu = {
-        try {
-            var updated = false
-            val file = File("/proc/stat")
-            if (file.exists() && file.canRead()) {
-                val line = file.useLines { it.firstOrNull() }
-                if (line != null && line.startsWith("cpu ")) {
-                    val parts = line.split("\\s+".toRegex())
-                    if (parts.size >= 5) {
-                        val user = parts[1].toLong()
-                        val nice = parts[2].toLong()
-                        val system = parts[3].toLong()
-                        val idle = parts[4].toLong()
-                        val ioWait = if (parts.size > 5) parts[5].toLong() else 0L
-                        val irq = if (parts.size > 6) parts[6].toLong() else 0L
-                        val softIrq = if (parts.size > 7) parts[7].toLong() else 0L
- 
-                        val active = user + nice + system + ioWait + irq + softIrq
-                        val total = active + idle
-
-                        val deltaTotal = total - (lastCpuTime + lastIdleTime)
-                        val deltaIdle = idle - lastIdleTime
-
-                        lastCpuTime = active
-                        lastIdleTime = idle
-
-                        if (deltaTotal > 0) {
-                            cpuUsage = (((deltaTotal - deltaIdle).toFloat() / deltaTotal.toFloat()) * 100f).coerceIn(0f, 100f)
-                            updated = true
-                        }
-                    }
-                }
-            }
-            if (!updated) {
-                // Android 8+ SELinux fallback: realistic organic load generator using active threads & mathematical noise
-                val activeThreads = Thread.activeCount().coerceIn(10, 150)
-                val baseLoad = (activeThreads / 150f) * 35f
-                val noise = (Math.sin(System.currentTimeMillis() / 4000.0) * 12.0).toFloat()
-                cpuUsage = (baseLoad + 20f + noise).coerceIn(5f, 95f)
-            }
-        } catch (_: Exception) {}
-    }
-
-    // Periodic polling loop — the /proc and /sys reads are file I/O, so they
-    // run on the IO dispatcher instead of blocking the main thread every tick
     LaunchedEffect(Unit) {
+        var previous: CpuSample? = null
         while (true) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                updateCpu()
-                updateRam()
-                temperature = getCpuTemp()
+            val reading = withContext(Dispatchers.IO) {
+                val next = readCpuSample()
+                val ram = readRam(context)
+                val sampled = Vitals(
+                    cpuPercent   = cpuUsage(previous, next),
+                    ramPercent   = ram?.first,
+                    ramUsedGb    = ram?.second,
+                    temperatureC = readTemperature(context)
+                )
+                if (next != null) previous = next
+                sampled
             }
+            vitals = reading
             delay(2500)
         }
     }
 
-    // Warning colors for diagnostics
-    val cpuColor = if (cpuUsage > 85f) Color(0xFFDD5555) else if (cpuUsage > 65f) Color(0xFFE6A23C) else accent
-    val ramColor = if (ramUsedPercent > 90f) Color(0xFFDD5555) else if (ramUsedPercent > 75f) Color(0xFFE6A23C) else accent
-    val tempColor = if (temperature > 75f) Color(0xFFDD5555) else if (temperature > 60f) Color(0xFFE6A23C) else accent
+    val cpuColor  = warningColor(vitals.cpuPercent, 65f, 85f, accent, isDayMode)
+    val ramColor  = warningColor(vitals.ramPercent, 75f, 90f, accent, isDayMode)
+    val tempColor = warningColor(vitals.temperatureC, 60f, 75f, accent, isDayMode)
+
+    val gauges = listOf(
+        GaugeData("CPU", vitals.cpuPercent, vitals.cpuPercent.percentText(), cpuColor),
+        GaugeData("RAM", vitals.ramPercent, vitals.ramUsedGb?.let { "%.1fG".format(it) } ?: NO_READING, ramColor),
+        GaugeData("TEMP", vitals.temperatureC, vitals.temperatureC?.let { "%.0f°".format(it) } ?: NO_READING, tempColor)
+    )
 
     Column(
         modifier = modifier.padding(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 8.dp),
@@ -177,30 +95,9 @@ fun VitalsWidget(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
             ) {
-                BarGauge(
-                    value = cpuUsage,
-                    label = "CPU",
-                    displayValue = "%.0f%%".format(cpuUsage),
-                    activeColor = cpuColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                BarGauge(
-                    value = ramUsedPercent,
-                    label = "RAM",
-                    displayValue = ramDisplayGb,
-                    activeColor = ramColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                BarGauge(
-                    value = temperature,
-                    label = "TEMP",
-                    displayValue = "%.0f°".format(temperature),
-                    activeColor = tempColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                gauges.forEach { gauge ->
+                    BarGauge(gauge = gauge, isDayMode = isDayMode, modifier = Modifier.fillMaxWidth())
+                }
             }
         } else {
             Row(
@@ -208,43 +105,99 @@ fun VitalsWidget(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                DialGauge(
-                    value = cpuUsage,
-                    label = "CPU",
-                    displayValue = "%.0f%%".format(cpuUsage),
-                    activeColor = cpuColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                )
-
-                DialGauge(
-                    value = ramUsedPercent,
-                    label = "RAM",
-                    displayValue = ramDisplayGb,
-                    activeColor = ramColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                )
-
-                DialGauge(
-                    value = temperature,
-                    label = "TEMP",
-                    displayValue = "%.0f°".format(temperature),
-                    activeColor = tempColor,
-                    isDayMode = isDayMode,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                )
+                gauges.forEach { gauge ->
+                    DialGauge(
+                        gauge = gauge,
+                        isDayMode = isDayMode,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                }
             }
         }
     }
 }
 
+private data class GaugeData(
+    val label: String,
+    val value: Float?,
+    val display: String,
+    val color: Color
+)
+
+private fun Float?.percentText(): String = this?.let { "%.0f%%".format(it) } ?: NO_READING
+
+private fun warningColor(
+    value: Float?,
+    warn: Float,
+    alert: Float,
+    accent: Color,
+    isDayMode: Boolean
+): Color = when {
+    value == null    -> if (isDayMode) Color(0xFFAAAAAA) else Color(0xFF555555)
+    value > alert    -> Color(0xFFDD5555)
+    value > warn     -> Color(0xFFE6A23C)
+    else             -> accent
+}
+
+// /proc/stat is unreadable for apps under the SELinux policy of Android 8 and
+// later. There is no substitute, so the gauge reports no reading.
+private fun readCpuSample(): CpuSample? = runCatching {
+    val file = File("/proc/stat")
+    if (!file.exists() || !file.canRead()) return null
+    val line = file.useLines { it.firstOrNull() } ?: return null
+    if (!line.startsWith("cpu ")) return null
+    val parts = line.trim().split("\\s+".toRegex())
+    if (parts.size < 5) return null
+    val user    = parts[1].toLong()
+    val nice    = parts[2].toLong()
+    val system  = parts[3].toLong()
+    val idle    = parts[4].toLong()
+    val ioWait  = parts.getOrNull(5)?.toLongOrNull() ?: 0L
+    val irq     = parts.getOrNull(6)?.toLongOrNull() ?: 0L
+    val softIrq = parts.getOrNull(7)?.toLongOrNull() ?: 0L
+    CpuSample(active = user + nice + system + ioWait + irq + softIrq, idle = idle)
+}.getOrNull()
+
+private fun cpuUsage(previous: CpuSample?, next: CpuSample?): Float? {
+    if (previous == null || next == null) return null
+    val deltaTotal = (next.active + next.idle) - (previous.active + previous.idle)
+    if (deltaTotal <= 0L) return null
+    val deltaIdle = next.idle - previous.idle
+    return ((deltaTotal - deltaIdle).toFloat() / deltaTotal.toFloat() * 100f).coerceIn(0f, 100f)
+}
+
+private fun readRam(context: Context): Pair<Float, Double>? = runCatching {
+    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+    val memInfo = ActivityManager.MemoryInfo()
+    am.getMemoryInfo(memInfo)
+    val gib = 1024.0 * 1024.0 * 1024.0
+    val totalGb = memInfo.totalMem / gib
+    if (totalGb <= 0.0) return null
+    val usedGb = totalGb - memInfo.availMem / gib
+    ((usedGb / totalGb) * 100.0).toFloat().coerceIn(0f, 100f) to usedGb
+}.getOrNull()
+
+private fun readTemperature(context: Context): Float? {
+    THERMAL_PATHS.forEach { path ->
+        val reading = runCatching {
+            val file = File(path)
+            if (!file.exists() || !file.canRead()) return@runCatching null
+            var value = file.readText().trim().toFloatOrNull() ?: return@runCatching null
+            if (value > 1000f) value /= 1000f
+            value.takeIf { it in 10f..150f }
+        }.getOrNull()
+        if (reading != null) return reading
+    }
+    return runCatching {
+        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val raw = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        if (raw > 0) raw / 10f else null
+    }.getOrNull()
+}
+
 @Composable
 private fun BarGauge(
-    value: Float,
-    label: String,
-    displayValue: String,
-    activeColor: Color,
+    gauge: GaugeData,
     isDayMode: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -262,15 +215,15 @@ private fun BarGauge(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = label,
+                text = gauge.label,
                 color = labelColor,
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp
             )
             Text(
-                text = displayValue,
-                color = contentColor,
+                text = gauge.display,
+                color = if (gauge.value == null) labelColor else contentColor,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -285,22 +238,21 @@ private fun BarGauge(
                 .background(trackColor)
                 .then(barBorder)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(fraction = (value / 100f).coerceIn(0f, 1f))
-                    .background(activeColor)
-            )
+            if (gauge.value != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = (gauge.value / 100f).coerceIn(0f, 1f))
+                        .background(gauge.color)
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun DialGauge(
-    value: Float,
-    label: String,
-    displayValue: String,
-    activeColor: Color,
+    gauge: GaugeData,
     isDayMode: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -321,8 +273,8 @@ private fun DialGauge(
         ) {
             Canvas(modifier = Modifier.fillMaxSize().padding(strokeWidth / 2)) {
                 val sw = strokeWidth.toPx()
+                val value = gauge.value
 
-                // Background track flat outline (light mode)
                 if (isDayMode) {
                     drawArc(
                         color = Color.Black.copy(alpha = 0.16f),
@@ -333,7 +285,6 @@ private fun DialGauge(
                     )
                 }
 
-                // Background Track Arc (240 degrees sweep starting at 150 degrees)
                 drawArc(
                     color = trackColor,
                     startAngle = 150f,
@@ -342,43 +293,41 @@ private fun DialGauge(
                     style = Stroke(width = sw, cap = StrokeCap.Round)
                 )
 
-                // Active Value flat outline (light mode)
-                if (isDayMode && value > 0f) {
+                if (value != null) {
                     val sweep = 240f * (value / 100f).coerceIn(0f, 1f)
+                    if (isDayMode && value > 0f) {
+                        drawArc(
+                            color = Color.Black.copy(alpha = 0.22f),
+                            startAngle = 149f,
+                            sweepAngle = sweep + 2f,
+                            useCenter = false,
+                            style = Stroke(width = sw + 0.8.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
                     drawArc(
-                        color = Color.Black.copy(alpha = 0.22f),
-                        startAngle = 149f,
-                        sweepAngle = sweep + 2f,
+                        color = gauge.color,
+                        startAngle = 150f,
+                        sweepAngle = sweep,
                         useCenter = false,
-                        style = Stroke(width = sw + 0.8.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = sw, cap = StrokeCap.Round)
                     )
                 }
-
-                // Active Value Arc
-                drawArc(
-                    color = activeColor,
-                    startAngle = 150f,
-                    sweepAngle = 240f * (value / 100f).coerceIn(0f, 1f),
-                    useCenter = false,
-                    style = Stroke(width = sw, cap = StrokeCap.Round)
-                )
             }
-            
-            // Centered text indicators
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = displayValue,
-                    color = contentColor,
+                    text = gauge.display,
+                    color = if (gauge.value == null) labelColor else contentColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(1.dp))
                 Text(
-                    text = label,
+                    text = gauge.label,
                     color = labelColor,
                     fontSize = 7.sp,
                     fontWeight = FontWeight.Bold,

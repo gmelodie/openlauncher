@@ -1,6 +1,5 @@
 package com.openlauncher.app.ui.screen
 
-import android.content.res.Configuration
 import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -25,7 +24,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,7 +33,15 @@ import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import com.openlauncher.app.data.AppSettings
 import com.openlauncher.app.data.ClockStyle
+import com.openlauncher.app.data.LevelReference
+import com.openlauncher.app.data.RadioPresets
+import com.openlauncher.app.data.SoundPadConfig
+import com.openlauncher.app.data.TripState
+import com.openlauncher.app.data.UnitSystem
+import com.openlauncher.app.data.activeWidgetIds
+import com.openlauncher.app.data.activeWidgets
 import com.openlauncher.app.data.computeWidgetMove
+import com.openlauncher.app.data.freeGridArea
 import com.openlauncher.app.data.GRID_COLS
 import com.openlauncher.app.data.GRID_ROWS
 import com.openlauncher.app.data.WidgetConfig
@@ -46,10 +52,11 @@ import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.GruvLightBg2
 import com.openlauncher.app.ui.theme.GruvLightBg3
 import com.openlauncher.app.ui.theme.GruvLightFg1
-import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.ui.widget.*
-import java.util.Calendar
 import com.openlauncher.app.util.LocationData
+import com.openlauncher.app.viewmodel.LauncherViewModel
+import java.util.Date
+import kotlinx.coroutines.delay
 
 private val WIDGET_RADIUS = RoundedCornerShape(0.dp)
 
@@ -72,29 +79,11 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads")
 )
 
-private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boolean {
-    val visibleIds = buildSet {
-        if (settings.showClock) add("CLOCK")
-        if (settings.showWeather) add("WEATHER")
-        if (settings.showNowPlaying) add("NOW_PLAYING")
-        if (settings.showTelemetry) add("TELEMETRY")
-        if (settings.showAltimeter) add("ALTIMETER")
-        if (settings.showSpeedometer) add("SPEEDOMETER")
-        if (settings.showVitals) add("VITALS")
-        if (settings.showTripTracker) add("TRIP_TRACKER")
-        if (settings.showSoundboard) add("SOUNDBOARD")
-    }
-    val activeWidgets = settings.widgetLayout.filter { it.enabled && it.id in visibleIds }
-    val occupied = buildSet<Pair<Int, Int>> {
-        activeWidgets.forEach { w ->
-            for (dx in 0 until w.spanX) for (dy in 0 until w.spanY) add(w.gridX + dx to w.gridY + dy)
-        }
-    }
-    val hasFreeCell = (0 until com.openlauncher.app.data.GRID_ROWS).any { r ->
-        (0 until com.openlauncher.app.data.GRID_COLS).any { c -> (c to r) !in occupied }
-    }
-    // Also true if any active widget spans >1 cell and can be shrunk to make room
-    val hasShrinkable = activeWidgets.any { it.spanX * it.spanY > 1 }
+private fun canAddWidget(settings: AppSettings): Boolean {
+    val active = settings.activeWidgets()
+    val hasFreeCell = freeGridArea(active, 1, 1) != null
+    // A widget that spans more than one cell can shrink to make room.
+    val hasShrinkable = active.any { it.spanX * it.spanY > 1 }
     return hasFreeCell || hasShrinkable
 }
 
@@ -102,8 +91,11 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
 fun HomeScreen(
     settings: AppSettings,
     weather: WeatherState?,
+    weatherError: String?,
     nowPlaying: NowPlayingState?,
     location: LocationData?,
+    gravity: FloatArray?,
+    trip: TripState,
     bearing: Float,
     isWifi: Boolean,
     isData: Boolean,
@@ -128,8 +120,14 @@ fun HomeScreen(
     onSetClockStyle: (ClockStyle) -> Unit,
     onSetVitalsAsBars: (Boolean) -> Unit = {},
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit = {},
-    onUpdateSoundPad: (index: Int, pad: com.openlauncher.app.data.SoundPadConfig) -> Unit = { _, _ -> },
-    hardwareRadio: com.openlauncher.app.viewmodel.LauncherViewModel.HardwareRadioState? = null,
+    onUpdateSoundPad: (index: Int, pad: SoundPadConfig) -> Unit = { _, _ -> },
+    onToggleTrip: () -> Unit = {},
+    onResetTrip: () -> Unit = {},
+    onRecordAccel: (Float) -> Unit = {},
+    onClearAccel: () -> Unit = {},
+    onCaptureLevel: (LevelReference) -> Unit = {},
+    onSetRadioPreset: (index: Int, isFm: Boolean, freq: Float) -> Unit = { _, _, _ -> },
+    hardwareRadio: LauncherViewModel.HardwareRadioState? = null,
     onLaunchHardwareRadio: () -> Unit = {},
     onStopHardwareRadio: () -> Unit = {},
     onRadioSeekUp: () -> Unit = {},
@@ -142,6 +140,7 @@ fun HomeScreen(
 ) {
     val accent       = Color(settings.accentColor)
     val gap          = 6.dp
+    val isMetric     = settings.unitSystem == UnitSystem.METRIC
     val hasWallpaper = settings.wallpaperUri.isNotEmpty()
     val widgetBg     = when {
         isDayMode    -> GruvLightBg1
@@ -160,10 +159,19 @@ fun HomeScreen(
     var resizingId    by remember { mutableStateOf<String?>(null) }
     var contextMenuId by remember { mutableStateOf<String?>(null) }
 
-    val configuration    = LocalConfiguration.current
-    val isLandscape      = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     var editMode         by remember { mutableStateOf(false) }
     var widgetLibraryOpen by remember { mutableStateOf(false) }
+
+    // The greeting on the clock cell used to freeze at the time of the last
+    // recomposition, so it needs a tick of its own.
+    val locale = currentLocale()
+    var now by remember { mutableStateOf(Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = Date()
+            delay(60_000L)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
 
@@ -190,33 +198,31 @@ fun HomeScreen(
             AnimatedVisibility(visible = isData, enter = fadeIn(), exit = fadeOut()) {
                 Icon(Icons.Default.SignalCellularAlt, "Data", tint = statusIconColor, modifier = Modifier.size(16.dp))
             }
-            if (isLandscape) {
-                Spacer(Modifier.width(8.dp))
-                if (editMode) {
-                    IconButton(
-                        onClick  = { widgetLibraryOpen = true },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector        = Icons.Default.Dashboard,
-                            contentDescription = "Widget library",
-                            tint               = controlIconColor,
-                            modifier           = Modifier.size(15.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(2.dp))
-                }
+            Spacer(Modifier.width(8.dp))
+            if (editMode) {
                 IconButton(
-                    onClick  = { editMode = !editMode },
+                    onClick  = { widgetLibraryOpen = true },
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector        = Icons.Default.Edit,
-                        contentDescription = "Edit widgets",
-                        tint               = if (editMode) accent else controlIconColor,
+                        imageVector        = Icons.Default.Dashboard,
+                        contentDescription = "Widget library",
+                        tint               = controlIconColor,
                         modifier           = Modifier.size(15.dp)
                     )
                 }
+                Spacer(Modifier.width(2.dp))
+            }
+            IconButton(
+                onClick  = { editMode = !editMode },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.Edit,
+                    contentDescription = "Edit widgets",
+                    tint               = if (editMode) accent else controlIconColor,
+                    modifier           = Modifier.size(15.dp)
+                )
             }
         }
 
@@ -234,25 +240,10 @@ fun HomeScreen(
             val cellStepXPx = with(density) { (cellW + gap).toPx() }
             val cellStepYPx = with(density) { (cellH + gap).toPx() }
 
-            // WEATHER stays in the set even with no data: the commit path
-            // (LauncherViewModel.moveWidgetConfig) computes against settings flags
-            // only, so dropping it here would make the drop ghost and the committed
-            // layout disagree. With no data the cell renders fully transparent.
-            val visibleIds = buildSet {
-                if (settings.showClock) add("CLOCK")
-                if (settings.showWeather) add("WEATHER")
-                if (settings.showNowPlaying) add("NOW_PLAYING")
-                if (settings.showTelemetry) add("TELEMETRY")
-                if (settings.showAltimeter) add("ALTIMETER")
-                if (settings.showSpeedometer) add("SPEEDOMETER")
-                if (settings.showVitals) add("VITALS")
-                if (settings.showTripTracker) add("TRIP_TRACKER")
-                if (settings.showSoundboard) add("SOUNDBOARD")
-            }
-
-            // Keep only visible widgets exactly as configured in settings, allowing explicit resizing to dictate layout
-            val visible = settings.widgetLayout.filter { it.enabled && it.id in visibleIds }
-            val rendered = visible
+            // WEATHER stays in the set even with no data. The commit path
+            // (LauncherViewModel.moveWidgetConfig) works from the settings flags
+            // alone, so a drop ghost would disagree with the committed layout.
+            val visible = settings.activeWidgets()
 
             // ── Drag state ───────────────────────────────────────────────────
             var draggingId   by remember { mutableStateOf<String?>(null) }
@@ -308,14 +299,14 @@ fun HomeScreen(
                     }
             }
 
-            rendered.forEach { w ->
+            visible.forEach { w ->
                 val xOff   = (cellW + gap) * w.gridX
                 val yOff   = (cellH + gap) * w.gridY
                 val width  = cellW * w.spanX + gap * (w.spanX - 1)
                 val height = cellH * w.spanY + gap * (w.spanY - 1)
 
                 val label = when (w.id) {
-                    "CLOCK"       -> clockTimeLabel(Calendar.getInstance())
+                    "CLOCK"       -> clockTimeLabel(now, locale)
                     "WEATHER"     -> "WEATHER"
                     "NOW_PLAYING" -> "NOW PLAYING"
                     "TELEMETRY"   -> "COMPASS"
@@ -408,7 +399,8 @@ fun HomeScreen(
                         "WEATHER" -> WeatherWidget(
                             state      = weather,
                             accent     = accent,
-                            metric     = settings.unitSystem.name == "METRIC",
+                            metric     = isMetric,
+                            error      = weatherError,
                             isDayMode  = isDayMode,
                             modifier   = Modifier.fillMaxSize()
                         )
@@ -426,6 +418,8 @@ fun HomeScreen(
                             modifier            = Modifier.fillMaxSize(),
                             isEditing           = editMode,
                             isDayMode           = isDayMode,
+                            radioPresets          = settings.radioPresets,
+                            onSetRadioPreset      = onSetRadioPreset,
                             hardwareRadio         = hardwareRadio,
                             onLaunchHardwareRadio = onLaunchHardwareRadio,
                             onStopHardwareRadio   = onStopHardwareRadio,
@@ -445,14 +439,17 @@ fun HomeScreen(
                         )
                         "ALTIMETER" -> AltimeterWidget(
                             location  = location,
-                            isMetric  = settings.unitSystem == com.openlauncher.app.data.UnitSystem.METRIC,
+                            gravity   = gravity,
+                            levelReference = settings.levelReference,
+                            isMetric  = isMetric,
                             accent    = accent,
+                            onCaptureLevel = onCaptureLevel,
                             isDayMode = isDayMode,
                             modifier  = Modifier.fillMaxSize()
                         )
                         "SPEEDOMETER" -> SpeedometerWidget(
                             location  = location,
-                            isMetric  = settings.unitSystem == com.openlauncher.app.data.UnitSystem.METRIC,
+                            isMetric  = isMetric,
                             accent    = accent,
                             isDayMode = isDayMode,
                             digitalOnly = settings.speedometerDigitalOnly,
@@ -465,9 +462,14 @@ fun HomeScreen(
                             modifier  = Modifier.fillMaxSize()
                         )
                         "TRIP_TRACKER" -> TripTrackerWidget(
+                            trip      = trip,
                             location  = location,
-                            isMetric  = settings.unitSystem == com.openlauncher.app.data.UnitSystem.METRIC,
+                            isMetric  = isMetric,
                             accent    = accent,
+                            onToggleTrip  = onToggleTrip,
+                            onResetTrip   = onResetTrip,
+                            onRecordAccel = onRecordAccel,
+                            onClearAccel  = onClearAccel,
                             isDayMode = isDayMode,
                             modifier  = Modifier.fillMaxSize()
                         )
@@ -594,99 +596,81 @@ private fun WidgetContextMenu(
                 .padding(vertical = 4.dp)
                 .width(200.dp)
         ) {
-            val inactiveMenuTint = if (isDayMode) Color(0xFF777777) else Color(0xFF555555)
-            ContextRow("RESIZE", Icons.Default.OpenWith, accent, onResize, isDayMode = isDayMode)
+            val row: @Composable (String, ImageVector, ContextTone, () -> Unit) -> Unit =
+                { label, icon, tone, onClick ->
+                    ContextRow(label, icon, tone, accent, onClick, isDayMode)
+                }
+            val toggleTone: (Boolean) -> ContextTone = { selected ->
+                if (selected) ContextTone.SELECTED else ContextTone.INACTIVE
+            }
+
+            row("RESIZE", Icons.Default.OpenWith, ContextTone.ACTION, onResize)
             if (widgetId == "CLOCK") {
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "DIGITAL",
-                    icon    = Icons.Default.Schedule,
-                    tint    = if (clockStyle == ClockStyle.DIGITAL) accent else inactiveMenuTint,
-                    onClick = { onSetClockStyle(ClockStyle.DIGITAL); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("DIGITAL", Icons.Default.Schedule, toggleTone(clockStyle == ClockStyle.DIGITAL)) {
+                    onSetClockStyle(ClockStyle.DIGITAL); onDismiss()
+                }
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "ANALOG",
-                    icon    = Icons.Default.Watch,
-                    tint    = if (clockStyle == ClockStyle.ANALOG) accent else inactiveMenuTint,
-                    onClick = { onSetClockStyle(ClockStyle.ANALOG); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("ANALOG", Icons.Default.Watch, toggleTone(clockStyle == ClockStyle.ANALOG)) {
+                    onSetClockStyle(ClockStyle.ANALOG); onDismiss()
+                }
             }
             if (widgetId == "VITALS") {
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "DIAL GAUGES",
-                    icon    = Icons.Default.Adjust,
-                    tint    = if (!vitalsAsBars) accent else inactiveMenuTint,
-                    onClick = { onSetVitalsAsBars(false); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("DIAL GAUGES", Icons.Default.Adjust, toggleTone(!vitalsAsBars)) {
+                    onSetVitalsAsBars(false); onDismiss()
+                }
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "BARS VIEW",
-                    icon    = Icons.Default.FormatAlignLeft,
-                    tint    = if (vitalsAsBars) accent else inactiveMenuTint,
-                    onClick = { onSetVitalsAsBars(true); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("BARS VIEW", Icons.Default.FormatAlignLeft, toggleTone(vitalsAsBars)) {
+                    onSetVitalsAsBars(true); onDismiss()
+                }
             }
             if (widgetId == "SPEEDOMETER") {
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "DIAL TRACK",
-                    icon    = Icons.Default.Speed,
-                    tint    = if (!speedometerDigitalOnly) accent else inactiveMenuTint,
-                    onClick = { onSetSpeedometerDigitalOnly(false); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("DIAL TRACK", Icons.Default.Speed, toggleTone(!speedometerDigitalOnly)) {
+                    onSetSpeedometerDigitalOnly(false); onDismiss()
+                }
                 HorizontalDivider(color = menuDivider)
-                ContextRow(
-                    label   = "DIGITAL ONLY",
-                    icon    = Icons.Default.Dialpad,
-                    tint    = if (speedometerDigitalOnly) accent else inactiveMenuTint,
-                    onClick = { onSetSpeedometerDigitalOnly(true); onDismiss() },
-                    isDayMode = isDayMode
-                )
+                row("DIGITAL ONLY", Icons.Default.Dialpad, toggleTone(speedometerDigitalOnly)) {
+                    onSetSpeedometerDigitalOnly(true); onDismiss()
+                }
             }
             if (widgetId == "NOW_PLAYING") {
                 HorizontalDivider(color = menuDivider)
-                ContextRow("ASSIGN CARPLAY APP",      Icons.Default.PhoneAndroid,  accent, onAssignCarPlay, isDayMode = isDayMode)
+                row("ASSIGN CARPLAY APP", Icons.Default.PhoneAndroid, ContextTone.ACTION, onAssignCarPlay)
                 if (carPlayPackage.isNotEmpty()) {
                     HorizontalDivider(color = menuDivider)
-                    ContextRow("CLEAR CARPLAY APP", Icons.Default.PhoneAndroid, Color(0xFF884444), onClearCarPlay, isDayMode = isDayMode)
+                    row("CLEAR CARPLAY APP", Icons.Default.PhoneAndroid, ContextTone.DANGER, onClearCarPlay)
                 }
                 HorizontalDivider(color = menuDivider)
-                ContextRow("ASSIGN ANDROID AUTO APP", Icons.Default.DirectionsCar, accent, onAssignAndroidAuto, isDayMode = isDayMode)
+                row("ASSIGN ANDROID AUTO APP", Icons.Default.DirectionsCar, ContextTone.ACTION, onAssignAndroidAuto)
                 if (androidAutoPackage.isNotEmpty()) {
                     HorizontalDivider(color = menuDivider)
-                    ContextRow("CLEAR ANDROID AUTO APP", Icons.Default.DirectionsCar, Color(0xFF884444), onClearAndroidAuto, isDayMode = isDayMode)
+                    row("CLEAR ANDROID AUTO APP", Icons.Default.DirectionsCar, ContextTone.DANGER, onClearAndroidAuto)
                 }
             }
-
         }
     }
 }
 
+private enum class ContextTone { ACTION, SELECTED, INACTIVE, DANGER }
+
+// Day and night tints come from the tone of the row, not from a comparison
+// against the hex value the caller passed.
 @Composable
 private fun ContextRow(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: Color,
+    icon: ImageVector,
+    tone: ContextTone,
+    accent: Color,
     onClick: () -> Unit,
     isDayMode: Boolean = false
 ) {
-    val finalTint = if (isDayMode) {
-        if (tint == Color(0xFF884444)) {
-            tint
-        } else if (tint == Color(0xFF777777)) {
-            Color(0xFF888888)
-        } else {
-            Color(0xFF111111)
-        }
-    } else {
-        tint
+    val finalTint = when (tone) {
+        ContextTone.DANGER   -> Color(0xFF884444)
+        ContextTone.SELECTED -> accent
+        ContextTone.INACTIVE -> if (isDayMode) Color(0xFF888888) else Color(0xFF555555)
+        ContextTone.ACTION   -> if (isDayMode) Color(0xFF111111) else accent
     }
     Row(
         modifier = Modifier
@@ -834,17 +818,7 @@ private fun WidgetLibraryDialog(
     val titleColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF555555)
     val closeColor  = if (isDayMode) Color(0xFF495057) else Color(0xFF444444)
 
-    val activeIds = buildSet {
-        if (settings.showClock) add("CLOCK")
-        if (settings.showWeather) add("WEATHER")
-        if (settings.showNowPlaying) add("NOW_PLAYING")
-        if (settings.showTelemetry) add("TELEMETRY")
-        if (settings.showAltimeter) add("ALTIMETER")
-        if (settings.showSpeedometer) add("SPEEDOMETER")
-        if (settings.showVitals) add("VITALS")
-        if (settings.showTripTracker) add("TRIP_TRACKER")
-        if (settings.showSoundboard) add("SOUNDBOARD")
-    }
+    val activeIds = settings.activeWidgetIds()
     val canAdd = canAddWidget(settings)
 
     Dialog(onDismissRequest = onDismiss) {

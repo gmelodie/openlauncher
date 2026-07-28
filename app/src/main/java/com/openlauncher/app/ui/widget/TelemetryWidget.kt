@@ -47,30 +47,20 @@ fun TelemetryWidget(
             val capturedMaxWidth  = maxWidth
             val capturedMaxHeight = maxHeight
 
-            // Rotating layer: ring + cardinal labels spin opposite to bearing
             Box(
                 modifier         = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                // Ring canvas rotates with -bearing
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationZ = -bearing }
-                ) {
-                    val cx = size.width  / 2f
-                    val cy = size.height / 2f
-                    val r  = radius.toPx()
-
+                Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
                         color  = ringColor,
-                        radius = r,
-                        center = Offset(cx, cy),
+                        radius = radius.toPx(),
+                        center = Offset(size.width / 2f, size.height / 2f),
                         style  = Stroke(width = 1.5.dp.toPx())
                     )
                 }
 
-                // Cardinal labels rotate with ring
+                // Only the cardinal labels carry the heading; the ring is round.
                 Box(
                     modifier         = Modifier
                         .fillMaxSize()

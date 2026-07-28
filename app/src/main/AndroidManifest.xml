@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network for weather API -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -15,19 +16,20 @@
     <!-- Required for LocationManager.sendExtraCommand (A-GPS reset) — normal protection, auto-granted -->
     <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
 
-    <!-- Compass / sensors -->
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
-
-    <!-- Media session control (requires notification access grant by user) -->
-    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
+    <!-- The compass uses the accelerometer and the magnetometer. Neither needs a
+         permission. Media control comes from the notification listener grant. -->
 
     <!-- Wallpaper from gallery -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- Query all packages required on API 30+ for getInstalledApplications -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- A launcher must list apps that have no launcher activity, such as the
+         CarPlay companions of a head unit. The <queries> block below cannot
+         return those, so the broad permission stays. This app is not
+         distributed through Google Play. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <!-- Required on API 30+ so PackageManager returns ALL launcher apps -->
     <queries>
@@ -43,8 +45,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
-        android:exported="true">
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
         <!-- Single launcher activity -->
         <activity

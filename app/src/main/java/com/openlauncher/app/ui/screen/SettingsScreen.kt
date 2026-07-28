@@ -32,10 +32,11 @@ import com.openlauncher.app.data.SidebarPosition
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.data.GradientDirection
 import com.openlauncher.app.data.UnitSystem
+import com.openlauncher.app.BuildConfig
+import com.openlauncher.app.util.homeRoleIntent
+import com.openlauncher.app.util.openHomeSettings
+import com.openlauncher.app.ui.theme.GruvLightBg1
 import com.openlauncher.app.ui.theme.LocalDayMode
-import com.openlauncher.app.util.SunriseSunset
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import com.openlauncher.app.ui.components.ColorPickerDialog
 import com.openlauncher.app.ui.components.ConfirmDialog
 
@@ -47,6 +48,7 @@ fun SettingsScreen(
     accent: Color,
     onUpdate: (AppSettings.() -> AppSettings) -> Unit,
     onReset: () -> Unit,
+    onRecalibrateLevel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -145,35 +147,9 @@ fun SettingsScreen(
                 icon     = Icons.Default.Home,
                 accent   = if (isDefaultLauncher) accent else Color(0xFF993333),
                 onClick  = {
-                    // Preferred: the system home-role dialog (API 29+). Vendor ROMs
-                    // sometimes ship without it, so fall through to the home-settings
-                    // screen, then the default-apps screen.
-                    var launched = false
-                    if (android.os.Build.VERSION.SDK_INT >= 29) {
-                        val rm = context.getSystemService(android.app.role.RoleManager::class.java)
-                        if (rm != null && rm.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) &&
-                            !rm.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)
-                        ) {
-                            launched = runCatching {
-                                homeRoleLauncher.launch(rm.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME))
-                            }.isSuccess
-                        }
-                    }
-                    if (!launched) {
-                        launched = runCatching {
-                            context.startActivity(
-                                Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }.isSuccess
-                    }
-                    if (!launched) {
-                        runCatching {
-                            context.startActivity(
-                                Intent("android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }
-                    }
+                    val roleIntent = homeRoleIntent(context)
+                    if (roleIntent != null) homeRoleLauncher.launch(roleIntent)
+                    else openHomeSettings(context)
                 }
             )
             SettingsDivider()
@@ -662,11 +638,7 @@ fun SettingsScreen(
         // ── GPS & Calibration ───────────────────────────────────────────────
         SettingsSection("GPS & Calibration") {
             var calibrationStatus by remember { mutableStateOf<String?>(null) }
-            val coroutineScope = rememberCoroutineScope()
-            var isCalibratingCompass by remember { mutableStateOf(false) }
-            var compassCountdown by remember { mutableIntStateOf(0) }
 
-            // 1. Reset A-GPS Button
             SettingsButton(
                 label    = "Reset A-GPS Assistance Data",
                 sublabel = calibrationStatus ?: "Forces cold start to download fresh satellite orbits entirely offline",
@@ -675,70 +647,49 @@ fun SettingsScreen(
                 onClick  = {
                     calibrationStatus = "Clearing A-GPS cache..."
                     val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
-                    var success = false
-                    try {
-                        // "delete_aiding_data" is the command AOSP's GPS provider
-                        // actually recognizes (requires ACCESS_LOCATION_EXTRA_COMMANDS)
-                        success = lm.sendExtraCommand(android.location.LocationManager.GPS_PROVIDER, "delete_aiding_data", android.os.Bundle())
+                    // "delete_aiding_data" is the command the AOSP GPS provider
+                    // recognises. It needs ACCESS_LOCATION_EXTRA_COMMANDS.
+                    val cleared = runCatching {
+                        lm.sendExtraCommand(android.location.LocationManager.GPS_PROVIDER, "delete_aiding_data", android.os.Bundle())
+                    }.getOrDefault(false)
+                    runCatching {
                         lm.sendExtraCommand(android.location.LocationManager.GPS_PROVIDER, "force_xtra_injection", null)
                         lm.sendExtraCommand(android.location.LocationManager.GPS_PROVIDER, "force_time_injection", null)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
-
-                    calibrationStatus = if (success) {
-                        "Cold start forced — go outdoors for a fresh satellite lock (2–3 min)"
+                    calibrationStatus = if (cleared) {
+                        "Cold start forced — go outdoors for a fresh satellite lock (2-3 min)"
                     } else {
                         "Not supported by this device's GPS driver — no data was cleared"
                     }
                 }
             )
-            
+
             SettingsDivider()
-            
-            // 2. Drive-in-circles magnetometer sweep. Android's sensor stack
-            // self-calibrates the magnetometer continuously — the circles feed it
-            // diverse readings. The timer guides the sweep; it does not (and
-            // cannot) apply offsets itself, so the message must not claim it did.
+
             SettingsButton(
-                label    = "Magnetometer Sweep (Parking Lot)",
-                sublabel = if (isCalibratingCompass) {
-                    "Sweep active: Drive slowly in two 360° circles... (${compassCountdown}s remaining)"
-                } else {
-                    "Guided sweep — Android self-calibrates the compass while you circle"
-                },
-                icon     = Icons.Default.Navigation,
-                accent   = if (isCalibratingCompass) Color.Green else accent,
-                onClick  = {
-                    if (!isCalibratingCompass) {
-                        isCalibratingCompass = true
-                        compassCountdown = 30
-                        coroutineScope.launch {
-                            while (compassCountdown > 0) {
-                                delay(1000)
-                                compassCountdown--
-                            }
-                            isCalibratingCompass = false
-                            calibrationStatus = "Sweep complete — check the compass widget; if heading is still off, use the manual offset below"
-                        }
-                    }
-                }
+                label    = "Recalibrate Level",
+                sublabel = if (settings.levelReference.isSet)
+                    "Roll and pitch read zero at the recorded angle of the unit"
+                else
+                    "Waiting for a reading — park level, then the next sample sets zero",
+                icon     = Icons.Default.Straighten,
+                accent   = accent,
+                onClick  = { onRecalibrateLevel() }
             )
 
             SettingsDivider()
 
-            // 4. Manual Compass Heading Offset Slider
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
                 SettingsRow(
                     label    = "Compass Heading Offset",
-                    sublabel = "Manual Alignment: ${if (settings.compassOffset >= 0) "+" else ""}${settings.compassOffset.toInt()}°  — aligns compass with vehicle front",
+                    sublabel = "Manual alignment: ${if (settings.compassOffset >= 0) "+" else ""}${settings.compassOffset.toInt()}° — aligns the compass with the vehicle front",
                     icon     = Icons.Default.Explore
                 ) {}
                 Slider(
                     value         = settings.compassOffset,
                     onValueChange = { onUpdate { copy(compassOffset = it) } },
                     valueRange    = -180f..180f,
-                    steps         = 71, // 5 degree steps: 360 / 5 - 1 = 71 steps
+                    steps         = 71,
                     colors        = sliderColors(accent),
                     modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
@@ -753,7 +704,7 @@ fun SettingsScreen(
                 icon     = Icons.Default.SystemUpdate,
                 accent   = accent,
                 onClick  = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dw2lam/openlauncher/releases"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/gmelodie/openlauncher/releases"))
                     context.startActivity(intent)
                 }
             )
@@ -765,7 +716,9 @@ fun SettingsScreen(
             Button(
                 onClick  = { showResetDialog = true },
                 shape    = RoundedCornerShape(4.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A0000)),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor = if (isDayMode) GruvLightBg1 else Color(0xFF1A0000)
+                ),
                 modifier = Modifier.fillMaxWidth().height(44.dp)
             ) {
                 Icon(Icons.Default.RestartAlt, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
@@ -778,7 +731,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text          = "v0.0.5  ·  Made by David Lam  ·  2026",
+            text          = "v${BuildConfig.VERSION_NAME}  ·  Made by David Lam  ·  2026",
             color         = if (isDayMode) Color(0xFFAAAAAA) else Color(0xFF2A2A2A),
             fontSize      = 10.sp,
             letterSpacing = 1.sp,
